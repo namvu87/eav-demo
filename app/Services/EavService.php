@@ -386,4 +386,222 @@ class EavService
 
         return $query->exists();
     }
+
+    /**
+     * ==========================================
+     * TREE HIERARCHY METHODS
+     * ==========================================
+     */
+
+    /**
+     * Get ancestors (breadcrumb) for an entity
+     * Returns: [root, parent, grandparent, ...]
+     */
+    public function getAncestors(Entity $entity): \Illuminate\Support\Collection
+    {
+        if (!$entity->path) {
+            return collect([]);
+        }
+
+        // Extract entity IDs from path: "/1/5/12/" => [1, 5, 12]
+        $ids = array_filter(explode('/', trim($entity->path, '/')));
+
+        if (empty($ids)) {
+            return collect([]);
+        }
+
+        // Get entities in correct order
+        return Entity::whereIn('entity_id', $ids)
+            ->orderBy('level')
+            ->get();
+    }
+
+    /**
+     * Get all descendants of an entity
+     * Returns all children recursively
+     */
+    public function getDescendants(Entity $entity): \Illuminate\Support\Collection
+    {
+        if (!$entity->path) {
+            return collect([]);
+        }
+
+        return Entity::where('path', 'like', $entity->path . '%')
+            ->where('entity_id', '!=', $entity->entity_id)
+            ->orderBy('path')
+            ->get();
+    }
+
+    /**
+     * Get direct children only
+     */
+    public function getChildren(Entity $entity): \Illuminate\Support\Collection
+    {
+        return Entity::where('parent_id', $entity->entity_id)
+            ->orderBy('sort_order')
+            ->orderBy('entity_name')
+            ->get();
+    }
+
+    /**
+     * Get tree structure for entity type
+     * Returns hierarchical tree with nested children
+     */
+    public function getTree(int $entityTypeId, ?int $rootEntityId = null): \Illuminate\Support\Collection
+    {
+        $query = Entity::where('entity_type_id', $entityTypeId)
+            ->where('is_active', true)
+            ->orderBy('path');
+
+        if ($rootEntityId) {
+            $rootEntity = Entity::find($rootEntityId);
+            if ($rootEntity) {
+                $query->where(function($q) use ($rootEntity) {
+                    $q->where('entity_id', $rootEntity->entity_id)
+                        ->orWhere('path', 'like', $rootEntity->path . '%');
+                });
+            }
+        } else {
+            // Only get roots if no specific root requested
+            $query->whereNull('parent_id');
+        }
+
+        $entities = $query->get();
+
+        return $this->buildTreeStructure($entities);
+    }
+
+    /**
+     * Build nested tree structure from flat collection
+     */
+    protected function buildTreeStructure(\Illuminate\Support\Collection $entities): \Illuminate\Support\Collection
+    {
+        $grouped = $entities->groupBy('parent_id');
+        $roots = $grouped->get(null, collect());
+
+        return $roots->map(function ($entity) use ($grouped) {
+            return $this->attachChildren($entity, $grouped);
+        });
+    }
+
+    /**
+     * Recursively attach children to entity
+     */
+    protected function attachChildren($entity, $grouped)
+    {
+        $children = $grouped->get($entity->entity_id, collect());
+
+        $entity->children_nodes = $children->map(function ($child) use ($grouped) {
+            return $this->attachChildren($child, $grouped);
+        });
+
+        return $entity;
+    }
+
+    /**
+     * Move entity to new parent
+     * Updates path and level for entity and all descendants
+     */
+    public function moveEntity(Entity $entity, ?int $newParentId): bool
+    {
+        DB::beginTransaction();
+
+        try {
+            // Validate: cannot move to itself or its descendants
+            if ($newParentId) {
+                $newParent = Entity::find($newParentId);
+
+                if (!$newParent) {
+                    throw new \Exception('New parent not found');
+                }
+
+                // Check if new parent is a descendant of current entity
+                if ($newParent->path && strpos($newParent->path, "/{$entity->entity_id}/") !== false) {
+                    throw new \Exception('Cannot move entity to its own descendant');
+                }
+
+                // Check if types are compatible (if needed)
+                if ($entity->entity_type_id !== $newParent->entity_type_id) {
+                    // Optional: Add logic to check if different types are allowed
+                }
+            }
+
+            // Store old path for updating descendants
+            $oldPath = $entity->path;
+
+            // Update entity parent
+            $entity->parent_id = $newParentId;
+
+            if ($newParentId) {
+                $parent = Entity::find($newParentId);
+                $entity->level = $parent->level + 1;
+                $entity->path = $parent->path . $entity->entity_id . '/';
+            } else {
+                $entity->level = 0;
+                $entity->path = '/' . $entity->entity_id . '/';
+            }
+
+            $entity->save();
+
+            // Update all descendants paths
+            $this->updateDescendantsPaths($entity, $oldPath);
+
+            DB::commit();
+            return true;
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * Update paths for all descendants after move
+     */
+    protected function updateDescendantsPaths(Entity $entity, string $oldPath): void
+    {
+        $descendants = Entity::where('path', 'like', $oldPath . '%')
+            ->where('entity_id', '!=', $entity->entity_id)
+            ->get();
+
+        foreach ($descendants as $descendant) {
+            // Replace old path prefix with new path
+            $descendant->path = str_replace($oldPath, $entity->path, $descendant->path);
+
+            // Recalculate level
+            $descendant->level = substr_count($descendant->path, '/') - 2;
+
+            $descendant->save();
+        }
+    }
+
+    /**
+     * Get breadcrumb string for entity
+     * Format: "Root → Parent → Child"
+     */
+    public function getBreadcrumbString(Entity $entity, string $separator = ' → '): string
+    {
+        $ancestors = $this->getAncestors($entity);
+
+        if ($ancestors->isEmpty()) {
+            return $entity->entity_name;
+        }
+
+        return $ancestors->pluck('entity_name')->implode($separator);
+    }
+
+    /**
+     * Get tree statistics
+     */
+    public function getTreeStats(int $entityTypeId): array
+    {
+        $entities = Entity::where('entity_type_id', $entityTypeId)->get();
+
+        return [
+            'total_entities' => $entities->count(),
+            'root_entities' => $entities->whereNull('parent_id')->count(),
+            'max_level' => $entities->max('level') ?? 0,
+            'entities_by_level' => $entities->groupBy('level')->map->count(),
+        ];
+    }
 }

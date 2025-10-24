@@ -25,40 +25,72 @@ class ViewEntity extends ViewRecord
         $eavService = app(EavService::class);
         $entityData = $eavService->getEntityWithAttributes($this->record->entity_id);
 
-        $schema = [
-            Infolists\Components\Section::make('Core Information')
+        $schema = [];
+
+        // Breadcrumb Section (if has ancestors)
+        $ancestors = $eavService->getAncestors($this->record);
+        if ($ancestors->isNotEmpty()) {
+            $breadcrumbString = $eavService->getBreadcrumbString($this->record);
+            
+            $schema[] = Infolists\Components\Section::make('Hierarchy Path')
                 ->schema([
-                    Infolists\Components\TextEntry::make('entity_code')
-                        ->label('Code')
-                        ->badge()
-                        ->color(fn () => $this->record->entityType->color ?? 'gray'),
-
-                    Infolists\Components\TextEntry::make('entity_name')
-                        ->label('Name')
-                        ->weight('bold'),
-
-                    Infolists\Components\TextEntry::make('entityType.type_name')
-                        ->label('Type')
-                        ->badge(),
-
-                    Infolists\Components\TextEntry::make('parent.entity_name')
-                        ->label('Parent')
-                        ->default('-'),
-
-                    Infolists\Components\TextEntry::make('level')
-                        ->label('Level'),
-
-                    Infolists\Components\TextEntry::make('path')
-                        ->label('Path')
-                        ->copyable(),
-
-                    Infolists\Components\TextEntry::make('description')
-                        ->label('Description')
-                        ->default('-')
+                    Infolists\Components\TextEntry::make('breadcrumb')
+                        ->label('Full Path')
+                        ->state($breadcrumbString)
+                        ->icon('heroicon-m-arrow-right')
+                        ->iconColor('primary')
+                        ->columnSpanFull()
+                        ->size('lg'),
+                    
+                    Infolists\Components\View::make('filament.resources.entity-resource.pages.ancestors-list')
+                        ->viewData([
+                            'ancestors' => $ancestors,
+                            'current' => $this->record,
+                        ])
                         ->columnSpanFull(),
                 ])
-                ->columns(2),
-        ];
+                ->collapsible();
+        }
+
+        // Core Information
+        $schema[] = Infolists\Components\Section::make('Core Information')
+            ->schema([
+                Infolists\Components\TextEntry::make('entity_code')
+                    ->label('Code')
+                    ->badge()
+                    ->color(fn () => $this->record->entityType->color ?? 'gray'),
+
+                Infolists\Components\TextEntry::make('entity_name')
+                    ->label('Name')
+                    ->weight('bold'),
+
+                Infolists\Components\TextEntry::make('entityType.type_name')
+                    ->label('Type')
+                    ->badge(),
+
+                Infolists\Components\TextEntry::make('parent.entity_name')
+                    ->label('Parent')
+                    ->default('-'),
+
+                Infolists\Components\TextEntry::make('level')
+                    ->label('Level')
+                    ->badge()
+                    ->color(fn ($state) => match(true) {
+                        $state === 0 => 'success',
+                        $state <= 2 => 'warning',
+                        default => 'danger',
+                    }),
+
+                Infolists\Components\TextEntry::make('path')
+                    ->label('Path')
+                    ->copyable(),
+
+                Infolists\Components\TextEntry::make('description')
+                    ->label('Description')
+                    ->default('-')
+                    ->columnSpanFull(),
+            ])
+            ->columns(2);
 
         // Add attribute sections
         if (!empty($entityData['attributes'])) {
@@ -79,6 +111,35 @@ class ViewEntity extends ViewRecord
                     ->schema($attributeEntries)
                     ->columns(2);
             }
+        }
+
+        // Tree Children Section
+        $children = $eavService->getChildren($this->record);
+        if ($children->isNotEmpty()) {
+            $schema[] = Infolists\Components\Section::make('Direct Children (' . $children->count() . ')')
+                ->schema([
+                    Infolists\Components\RepeatableEntry::make('children')
+                        ->state($children->map(fn ($child) => [
+                            'entity_id' => $child->entity_id,
+                            'entity_code' => $child->entity_code,
+                            'entity_name' => $child->entity_name,
+                            'level' => $child->level,
+                        ])->toArray())
+                        ->schema([
+                            Infolists\Components\TextEntry::make('entity_code')
+                                ->badge()
+                                ->color('primary'),
+                            Infolists\Components\TextEntry::make('entity_name')
+                                ->weight('medium'),
+                            Infolists\Components\TextEntry::make('level')
+                                ->badge()
+                                ->color('gray'),
+                        ])
+                        ->columns(3)
+                        ->columnSpanFull(),
+                ])
+                ->collapsible()
+                ->collapsed();
         }
 
         // Relations section
