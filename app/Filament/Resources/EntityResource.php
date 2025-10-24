@@ -223,7 +223,20 @@ class EntityResource extends Resource
                     ->label('Name')
                     ->searchable()
                     ->sortable()
-                    ->weight('medium'),
+                    ->weight('medium')
+                    ->formatStateUsing(function ($state, $record) {
+                        // Add tree indentation
+                        $indent = str_repeat('&nbsp;&nbsp;&nbsp;&nbsp;', $record->level);
+                        $prefix = $record->level > 0 ? '└─ ' : '';
+                        return new \Illuminate\Support\HtmlString($indent . $prefix . e($state));
+                    })
+                    ->description(function ($record) {
+                        // Show parent name if exists
+                        if ($record->parent_id && $record->parent) {
+                            return '↳ ' . $record->parent->entity_name;
+                        }
+                        return null;
+                    }),
 
                 Tables\Columns\TextColumn::make('entityType.type_name')
                     ->label('Type')
@@ -273,6 +286,52 @@ class EntityResource extends Resource
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
+                
+                // Move Entity Action
+                Tables\Actions\Action::make('move')
+                    ->label('Move')
+                    ->icon('heroicon-o-arrows-right-left')
+                    ->color('warning')
+                    ->form([
+                        Forms\Components\Select::make('new_parent_id')
+                            ->label('New Parent')
+                            ->options(function ($record) {
+                                // Get all entities of same type except current and its descendants
+                                $descendants = app(\App\Services\EavService::class)
+                                    ->getDescendants($record)
+                                    ->pluck('entity_id')
+                                    ->push($record->entity_id);
+
+                                return \App\Models\Entity::where('entity_type_id', $record->entity_type_id)
+                                    ->whereNotIn('entity_id', $descendants)
+                                    ->pluck('entity_name', 'entity_id')
+                                    ->prepend('(Root - No Parent)', null);
+                            })
+                            ->searchable()
+                            ->helperText('Select new parent or leave empty for root level'),
+                    ])
+                    ->action(function ($record, array $data) {
+                        try {
+                            $eavService = app(\App\Services\EavService::class);
+                            $eavService->moveEntity($record, $data['new_parent_id']);
+                            
+                            \Filament\Notifications\Notification::make()
+                                ->title('Entity moved successfully')
+                                ->success()
+                                ->send();
+                        } catch (\Exception $e) {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Error moving entity')
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    })
+                    ->requiresConfirmation()
+                    ->modalHeading('Move Entity')
+                    ->modalDescription('Move this entity to a new parent in the hierarchy.')
+                    ->visible(fn ($record) => $record->entity_type_id !== null),
+                
                 Tables\Actions\DeleteAction::make(),
             ])
             ->bulkActions([
@@ -280,7 +339,8 @@ class EntityResource extends Resource
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ])
-            ->defaultSort('entity_code', 'asc');
+            ->defaultSort('path', 'asc')
+            ->poll('30s'); // Auto-refresh every 30 seconds
     }
 
     public static function getPages(): array
@@ -290,6 +350,7 @@ class EntityResource extends Resource
             'create' => Pages\CreateEntity::route('/create'),
             'edit' => Pages\EditEntity::route('/{record}/edit'),
             'view' => Pages\ViewEntity::route('/{record}'),
+            'tree' => Pages\TreeEntities::route('/tree'),
         ];
     }
 }
