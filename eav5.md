@@ -1527,26 +1527,602 @@ VALUES
 
 ### 7.1. Mô tả nghiệp vụ
 
-Tìm kiếm entities theo tên, mã, attributes động.
+**Tìm kiếm và lọc entities** theo nhiều tiêu chí:
+- Full-text search: Tìm theo tên, mã, mô tả
+- Filter theo entity type
+- Filter theo giá trị attributes động
+- Filter theo quan hệ
+- Filter theo cấu trúc cây (parent, descendants)
+- Kết hợp nhiều điều kiện (AND/OR)
 
-### 7.2. API Endpoints
+### 7.2. User Stories
+
+**US-6.1: Tìm kiếm đơn giản**
+```
+Là user
+Tôi muốn tìm kiếm "Chợ Rẫy"
+Để tìm tất cả entities có tên hoặc mã chứa từ khóa
+```
+
+**US-6.2: Lọc theo attributes**
+```
+Là user
+Tôi muốn tìm tất cả Hospital có capacity_beds > 1000
+Và loại hình = "Công lập"
+```
+
+**US-6.3: Lọc kết hợp**
+```
+Là user
+Tôi muốn tìm tất cả Departments
+Thuộc Hospital "Chợ Rẫy"
+Có address ở "Quận 5"
+```
+
+**US-6.4: Lọc theo quan hệ**
+```
+Là user
+Tôi muốn tìm tất cả Equipment
+Được sử dụng (uses) bởi Department "Khoa Nội"
+```
+
+### 7.3. Bảng liên quan
+
+#### Bảng chính sử dụng
+
+| Bảng | Vai trò | Use case |
+|------|---------|----------|
+| `entities` | Tìm theo code, name, description | Full-text search |
+| `entity_types` | Filter theo loại | type_id = ? |
+| `attributes` | Xác định attribute cần filter | attribute_code = 'capacity_beds' |
+| `entity_values_varchar` | Tìm theo text ngắn | LIKE '%keyword%' |
+| `entity_values_text` | Tìm theo text dài | FULLTEXT search |
+| `entity_values_int` | Filter theo số | value > ? |
+| `entity_values_decimal` | Filter theo decimal | value BETWEEN ? AND ? |
+| `entity_values_datetime` | Filter theo ngày | value >= ? |
+| `entity_values_file` | Tìm theo tên file | file_name LIKE ? |
+| `entity_relations` | Filter theo quan hệ | relation_type = 'uses' |
+
+### 7.4. Business Rules
+
+| Rule ID | Mô tả | Implementation | Severity |
+|---------|-------|----------------|----------|
+| BR-6.1 | Full-text search không phân biệt hoa thường | COLLATE utf8mb4_unicode_ci | AUTO |
+| BR-6.2 | Tìm kiếm text dài dùng FULLTEXT index | entity_values_text có FULLTEXT | PERFORMANCE |
+| BR-6.3 | Filter nhiều attributes → JOIN nhiều bảng values | Dynamic query builder | PERFORMANCE |
+| BR-6.4 | Pagination bắt buộc (max 100 rows/page) | LIMIT OFFSET | REQUIRED |
+| BR-6.5 | Cache kết quả tìm kiếm phổ biến | Redis 15 phút | PERFORMANCE |
+| BR-6.6 | Filter theo date range: from_date, to_date | BETWEEN clause | AUTO |
+| BR-6.7 | Operator hỗ trợ: =, !=, >, <, >=, <=, LIKE, IN, BETWEEN | Query builder | AUTO |
+
+### 7.5. API Endpoints
 
 ```
-GET    /api/entities/search?q=keyword         # Full-text
+GET    /api/entities/search?q=keyword&type_id=1&page=1&per_page=20
 POST   /api/entities/filter                   # Advanced filter
+GET    /api/entities/quick-search?q=keyword   # Autocomplete
+POST   /api/entities/export                   # Export kết quả search
+GET    /api/search/suggestions?q=keyword      # Search suggestions
 ```
 
-### 7.3. Query Examples
+### 7.6. Request/Response Examples
 
-**Filter theo attributes**
+**Request 1: Simple search**
+```json
+GET /api/entities/search?q=Chợ Rẫy&type_id=1
+
+Response:
+{
+  "success": true,
+  "data": {
+    "total": 3,
+    "per_page": 20,
+    "current_page": 1,
+    "entities": [
+      {
+        "entity_id": 1,
+        "entity_code": "HS-001",
+        "entity_name": "Bệnh viện Chợ Rẫy",
+        "entity_type": {
+          "type_code": "hospital",
+          "type_name": "Bệnh viện",
+          "icon": "🏥"
+        },
+        "matched_fields": ["entity_name"],
+        "highlight": "Bệnh viện <mark>Chợ Rẫy</mark>"
+      }
+    ]
+  }
+}
+```
+
+**Request 2: Advanced filter**
+```json
+POST /api/entities/filter
+{
+  "entity_type_id": 1,
+  "conditions": [
+    {
+      "attribute_code": "capacity_beds",
+      "operator": ">",
+      "value": 1000
+    },
+    {
+      "attribute_code": "hospital_type",
+      "operator": "=",
+      "value": 1  // option_id của "Công lập"
+    },
+    {
+      "attribute_code": "address",
+      "operator": "LIKE",
+      "value": "%Quận 5%"
+    }
+  ],
+  "logic": "AND",  // hoặc "OR"
+  "sort_by": "entity_name",
+  "sort_order": "asc",
+  "page": 1,
+  "per_page": 20
+}
+
+Response:
+{
+  "success": true,
+  "data": {
+    "total": 5,
+    "per_page": 20,
+    "current_page": 1,
+    "filters_applied": 3,
+    "entities": [
+      {
+        "entity_id": 1,
+        "entity_code": "HS-001",
+        "entity_name": "Bệnh viện Chợ Rẫy",
+        "attributes": {
+          "capacity_beds": 1800,
+          "hospital_type": "Công lập",
+          "address": "201B Nguyễn Chí Thanh, Q5"
+        }
+      }
+      // ... more entities
+    ]
+  }
+}
+```
+
+**Request 3: Filter theo quan hệ**
+```json
+POST /api/entities/filter
+{
+  "entity_type_id": 3,  // Equipment
+  "relations": [
+    {
+      "relation_type": "uses",
+      "direction": "incoming",  // Equipment được used bởi...
+      "target_entity_id": 10,   // Department "Khoa Nội"
+      "target_type_id": 2
+    }
+  ]
+}
+
+Response:
+{
+  "success": true,
+  "data": {
+    "total": 15,
+    "entities": [
+      {
+        "entity_id": 20,
+        "entity_code": "EQ-001",
+        "entity_name": "Máy X-quang",
+        "relation_info": {
+          "relation_type": "uses",
+          "source": "Department: Khoa Nội",
+          "metadata": {
+            "quantity": 5,
+            "location": "Room 101"
+          }
+        }
+      }
+    ]
+  }
+}
+```
+
+**Request 4: Filter theo cây phân cấp**
+```json
+POST /api/entities/filter
+{
+  "parent_id": 1,  // Tất cả descendants của Hospital HS-001
+  "max_level": 2,  // Chỉ lấy đến level 2
+  "entity_type_id": 3  // Chỉ lấy type Room
+}
+
+Response:
+{
+  "success": true,
+  "data": {
+    "total": 25,
+    "entities": [
+      {
+        "entity_id": 5,
+        "entity_code": "RM-101",
+        "entity_name": "Phòng 101",
+        "level": 2,
+        "path": "/1/2/5/",
+        "breadcrumb": "HS-001 → DP-001 → RM-101"
+      }
+    ]
+  }
+}
+```
+
+**Request 5: Quick search (Autocomplete)**
+```json
+GET /api/entities/quick-search?q=Ch&limit=10
+
+Response:
+{
+  "success": true,
+  "data": [
+    {
+      "entity_id": 1,
+      "entity_code": "HS-001",
+      "entity_name": "Bệnh viện Chợ Rẫy",
+      "type_name": "Hospital",
+      "icon": "🏥"
+    },
+    {
+      "entity_id": 15,
+      "entity_code": "HS-002",
+      "entity_name": "Bệnh viện Chấn thương",
+      "type_name": "Hospital",
+      "icon": "🏥"
+    }
+  ]
+}
+```
+
+### 7.7. Luồng nghiệp vụ "Advanced Filter"
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant UI as Frontend
+    participant API as API
+    participant SVC as SearchService
+    participant QB as QueryBuilder
+    participant DB as Database
+    participant Cache as Redis Cache
+    
+    U->>UI: Nhập điều kiện filter
+    UI->>API: POST /api/entities/filter
+    API->>SVC: filter(criteria)
+    
+    SVC->>Cache: Check cache key
+    Cache->>SVC: Cache miss
+    
+    SVC->>QB: buildQuery(criteria)
+    
+    QB->>QB: Parse entity_type_id
+    QB->>QB: Add base query: SELECT FROM entities
+    
+    loop For each attribute condition
+        QB->>QB: Determine backend_type
+        QB->>QB: JOIN entity_values_{type}
+        QB->>QB: Add WHERE condition
+    end
+    
+    alt Has relation filter
+        QB->>QB: JOIN entity_relations
+        QB->>QB: Add relation conditions
+    end
+    
+    alt Has tree filter
+        QB->>QB: Add path LIKE condition
+        QB->>QB: Add level condition
+    end
+    
+    QB->>QB: Add pagination: LIMIT OFFSET
+    QB->>QB: Add sorting: ORDER BY
+    QB->>SVC: SQL query
+    
+    SVC->>DB: Execute query
+    DB->>SVC: Result rows
+    
+    SVC->>DB: Get total count (without limit)
+    DB->>SVC: Total count
+    
+    loop For each entity
+        SVC->>DB: Load attributes (eager loading)
+        DB->>SVC: Attribute values
+    end
+    
+    SVC->>SVC: Format response
+    SVC->>Cache: Store result (15 min)
+    
+    SVC->>API: Filtered entities
+    API->>UI: JSON response
+    UI->>U: Hiển thị kết quả
+```
+
+### 7.8. Query Examples
+
+**Query 1: Full-text search**
+```sql
+-- Tìm kiếm đơn giản
+SELECT 
+    e.*,
+    et.type_name,
+    et.icon
+FROM entities e
+JOIN entity_types et ON e.entity_type_id = et.entity_type_id
+WHERE e.is_active = 1
+AND (
+    e.entity_code LIKE CONCAT('%', ?, '%')
+    OR e.entity_name LIKE CONCAT('%', ?, '%')
+    OR e.description LIKE CONCAT('%', ?, '%')
+)
+ORDER BY 
+    CASE 
+        WHEN e.entity_code = ? THEN 1
+        WHEN e.entity_code LIKE CONCAT(?, '%') THEN 2
+        WHEN e.entity_name LIKE CONCAT(?, '%') THEN 3
+        ELSE 4
+    END,
+    e.entity_name
+LIMIT 20 OFFSET 0;
+```
+
+**Query 2: Filter theo 1 attribute**
 ```sql
 -- Tìm Hospital có capacity_beds > 1000
+SELECT DISTINCT 
+    e.*,
+    et.type_name,
+    v_int.value as capacity_beds
+FROM entities e
+JOIN entity_types et ON e.entity_type_id = et.entity_type_id
+JOIN attributes a ON a.attribute_code = 'capacity_beds' 
+                  AND (a.entity_type_id = e.entity_type_id OR a.entity_type_id IS NULL)
+JOIN entity_values_int v_int ON v_int.entity_id = e.entity_id 
+                              AND v_int.attribute_id = a.attribute_id
+WHERE e.entity_type_id = 1  -- Hospital
+AND e.is_active = 1
+AND v_int.value > 1000
+ORDER BY v_int.value DESC;
+```
+
+**Query 3: Filter theo nhiều attributes (AND)**
+```sql
+-- Tìm Hospital: capacity_beds > 1000 AND hospital_type = 'Công lập' AND address LIKE '%Q5%'
+SELECT DISTINCT 
+    e.*,
+    et.type_name
+FROM entities e
+JOIN entity_types et ON e.entity_type_id = et.entity_type_id
+
+-- Condition 1: capacity_beds > 1000
+JOIN attributes a1 ON a1.attribute_code = 'capacity_beds'
+JOIN entity_values_int v1 ON v1.entity_id = e.entity_id 
+                          AND v1.attribute_id = a1.attribute_id
+                          AND v1.value > 1000
+
+-- Condition 2: hospital_type = 1 (Công lập)
+JOIN attributes a2 ON a2.attribute_code = 'hospital_type'
+JOIN entity_values_int v2 ON v2.entity_id = e.entity_id 
+                          AND v2.attribute_id = a2.attribute_id
+                          AND v2.value = 1
+
+-- Condition 3: address LIKE '%Q5%'
+JOIN attributes a3 ON a3.attribute_code = 'address'
+JOIN entity_values_text v3 ON v3.entity_id = e.entity_id 
+                            AND v3.attribute_id = a3.attribute_id
+                            AND v3.value LIKE '%Q5%'
+
+WHERE e.entity_type_id = 1
+AND e.is_active = 1;
+```
+
+**Query 4: Filter với OR logic**
+```sql
+-- Tìm Hospital: capacity_beds > 1000 OR hospital_type = 'Quốc tế'
 SELECT DISTINCT e.*
 FROM entities e
-JOIN attributes a ON a.attribute_code = 'capacity_beds'
-JOIN entity_values_int v ON v.entity_id = e.entity_id AND v.attribute_id = a.attribute_id
-WHERE e.entity_type_id = 1  -- Hospital
-AND v.value > 1000;
+WHERE e.entity_type_id = 1
+AND e.is_active = 1
+AND (
+    -- Condition 1
+    EXISTS (
+        SELECT 1 FROM attributes a1
+        JOIN entity_values_int v1 ON v1.entity_id = e.entity_id 
+                                  AND v1.attribute_id = a1.attribute_id
+        WHERE a1.attribute_code = 'capacity_beds'
+        AND v1.value > 1000
+    )
+    OR
+    -- Condition 2
+    EXISTS (
+        SELECT 1 FROM attributes a2
+        JOIN entity_values_int v2 ON v2.entity_id = e.entity_id 
+                                  AND v2.attribute_id = a2.attribute_id
+        WHERE a2.attribute_code = 'hospital_type'
+        AND v2.value = 3  -- Quốc tế
+    )
+);
+```
+
+**Query 5: Filter theo quan hệ**
+```sql
+-- Tìm tất cả Equipment được sử dụng bởi Department id=10
+SELECT 
+    e.*,
+    et.type_name,
+    r.relation_data
+FROM entity_relations r
+JOIN entities e ON r.target_entity_id = e.entity_id  -- Equipment
+JOIN entity_types et ON e.entity_type_id = et.entity_type_id
+WHERE r.source_entity_id = 10  -- Department
+AND r.relation_type = 'uses'
+AND r.is_active = 1
+AND e.is_active = 1
+ORDER BY e.entity_name;
+```
+
+**Query 6: Filter theo cây + attributes**
+```sql
+-- Tìm tất cả Rooms thuộc Hospital id=1, có area_m2 > 30
+SELECT DISTINCT
+    e.*,
+    et.type_name,
+    v_dec.value as area_m2
+FROM entities e
+JOIN entity_types et ON e.entity_type_id = et.entity_type_id
+JOIN attributes a ON a.attribute_code = 'area_m2'
+JOIN entity_values_decimal v_dec ON v_dec.entity_id = e.entity_id 
+                                 AND v_dec.attribute_id = a.attribute_id
+WHERE e.path LIKE '/1/%'  -- Descendants của Hospital id=1
+AND e.entity_type_id = 3  -- Room type
+AND e.level = 2           -- Chỉ level 2
+AND v_dec.value > 30
+AND e.is_active = 1
+ORDER BY v_dec.value DESC;
+```
+
+**Query 7: Fulltext search trong text fields**
+```sql
+-- Tìm kiếm fulltext trong description, notes
+SELECT 
+    e.*,
+    et.type_name,
+    MATCH(v_text.value) AGAINST(? IN NATURAL LANGUAGE MODE) as relevance
+FROM entities e
+JOIN entity_types et ON e.entity_type_id = et.entity_type_id
+JOIN attributes a ON a.backend_type = 'text'
+JOIN entity_values_text v_text ON v_text.entity_id = e.entity_id 
+                               AND v_text.attribute_id = a.attribute_id
+WHERE MATCH(v_text.value) AGAINST(? IN NATURAL LANGUAGE MODE)
+AND e.is_active = 1
+ORDER BY relevance DESC
+LIMIT 20;
+```
+
+**Query 8: Aggregate search (Count entities by type)**
+```sql
+-- Thống kê kết quả tìm kiếm theo type
+SELECT 
+    et.entity_type_id,
+    et.type_name,
+    et.icon,
+    COUNT(DISTINCT e.entity_id) as count
+FROM entities e
+JOIN entity_types et ON e.entity_type_id = et.entity_type_id
+WHERE e.is_active = 1
+AND (
+    e.entity_code LIKE CONCAT('%', ?, '%')
+    OR e.entity_name LIKE CONCAT('%', ?, '%')
+)
+GROUP BY et.entity_type_id
+ORDER BY count DESC;
+```
+
+### 7.9. Performance Optimization
+
+#### 7.9.1. Indexes cần thiết
+
+```sql
+-- entities table
+CREATE INDEX idx_entities_search ON entities(entity_code, entity_name, is_active);
+CREATE INDEX idx_entities_tree ON entities(path(255), level, is_active);
+
+-- entity_values_varchar
+CREATE INDEX idx_varchar_search ON entity_values_varchar(value(100));
+
+-- entity_values_text (đã có FULLTEXT)
+CREATE FULLTEXT INDEX ft_text_value ON entity_values_text(value);
+
+-- entity_values_int
+CREATE INDEX idx_int_value ON entity_values_int(value);
+CREATE INDEX idx_int_entity_attr ON entity_values_int(entity_id, attribute_id, value);
+
+-- entity_values_decimal
+CREATE INDEX idx_decimal_value ON entity_values_decimal(value);
+
+-- entity_values_datetime
+CREATE INDEX idx_datetime_value ON entity_values_datetime(value);
+
+-- entity_relations
+CREATE INDEX idx_relations_search ON entity_relations(source_entity_id, target_entity_id, relation_type, is_active);
+```
+
+#### 7.9.2. Caching Strategy
+
+```php
+// Cache key pattern
+$cacheKey = sprintf(
+    'search:%s:%s:%s',
+    md5(json_encode($criteria)),
+    $page,
+    $perPage
+);
+
+// Cache 15 phút
+Cache::remember($cacheKey, 900, function() use ($criteria) {
+    return $this->executeSearch($criteria);
+});
+```
+
+#### 7.9.3. Query Optimization Tips
+
+1. **Eager Loading**: Load attributes trong 1 query thay vì N+1
+2. **Pagination**: LIMIT + OFFSET, không load hết
+3. **Count riêng**: SELECT COUNT(*) riêng, không cùng query chính
+4. **Index hint**: USE INDEX khi cần
+5. **Avoid SELECT ***: Chỉ select fields cần thiết
+
+### 7.10. Dữ liệu mẫu
+
+```sql
+-- Test data cho tìm kiếm
+
+-- Hospitals với attributes đa dạng
+INSERT INTO entities (entity_type_id, entity_code, entity_name, description) VALUES
+(1, 'HS-001', 'Bệnh viện Chợ Rẫy', 'Bệnh viện đa khoa hạng đặc biệt, lớn nhất TP.HCM'),
+(1, 'HS-002', 'Bệnh viện Nhi Đồng 1', 'Chuyên khoa nhi, bệnh viện hàng đầu về nhi khoa'),
+(1, 'HS-003', 'Bệnh viện Thống Nhất', 'Bệnh viện đa khoa hạng I, trực thuộc Bộ Y Tế');
+
+-- Attributes values
+INSERT INTO entity_values_int VALUES
+(NULL, 1, 3, 1800, NOW(), NOW()),  -- HS-001: capacity_beds = 1800
+(NULL, 2, 3, 600, NOW(), NOW()),   -- HS-002: capacity_beds = 600
+(NULL, 3, 3, 1200, NOW(), NOW());  -- HS-003: capacity_beds = 1200
+
+INSERT INTO entity_values_int VALUES
+(NULL, 1, 5, 1, NOW(), NOW()),  -- HS-001: hospital_type = Công lập
+(NULL, 2, 5, 1, NOW(), NOW()),  -- HS-002: hospital_type = Công lập
+(NULL, 3, 5, 3, NOW(), NOW());  -- HS-003: hospital_type = Quốc tế
+
+INSERT INTO entity_values_text VALUES
+(NULL, 1, 1, '201B Nguyễn Chí Thanh, Phường 12, Quận 5, TP.HCM', NOW(), NOW()),
+(NULL, 2, 1, '341 Sư Vạn Hạnh, Phường 12, Quận 10, TP.HCM', NOW(), NOW()),
+(NULL, 3, 1, '1 Lý Thường Kiệt, Phường 7, Quận Tân Bình, TP.HCM', NOW(), NOW());
+```
+
+**Test queries:**
+
+```sql
+-- 1. Tìm "Chợ Rẫy"
+SELECT * FROM entities WHERE entity_name LIKE '%Chợ Rẫy%';
+-- Result: HS-001
+
+-- 2. Filter capacity_beds > 1000
+-- Result: HS-001 (1800), HS-003 (1200)
+
+-- 3. Filter capacity_beds > 1000 AND hospital_type = 'Công lập'
+-- Result: HS-001 (1800)
+
+-- 4. Filter address LIKE '%Quận 5%'
+-- Result: HS-001
 ```
 
 ---
