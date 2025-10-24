@@ -1131,7 +1131,217 @@ GET    /api/entities/{id}/ancestors           # Ancestors (breadcrumb)
 POST   /api/entities/{id}/move                # Di chuyển
 ```
 
-### 6.5. Query Examples
+### 6.5. Business Rules
+
+| Rule ID | Mô tả | Implementation | Severity |
+|---------|-------|----------------|----------|
+| BR-5.1 | parent_id phải là entity hợp lệ | FK constraint | ERROR |
+| BR-5.2 | Không tạo circular reference | Check ancestors before update | ERROR |
+| BR-5.3 | level auto = parent.level + 1 | Calculate on save | AUTO |
+| BR-5.4 | path auto = parent.path + entity_id + '/' | Calculate on save | AUTO |
+| BR-5.5 | Di chuyển entity → update path của tất cả descendants | Cascade update | AUTO |
+| BR-5.6 | Xóa entity có children → error hoặc cascade | Configurable | ERROR/WARNING |
+| BR-5.7 | Entity chỉ có thể parent với cùng type hoặc allowed types | Validate theo config | WARNING |
+
+### 6.6. Request/Response Examples
+
+**Request 1: Lấy cây phân cấp của Hospital**
+```json
+GET /api/entity-types/1/tree?expand=2
+
+Response:
+{
+  "success": true,
+  "data": [
+    {
+      "entity_id": 1,
+      "entity_code": "HS-001",
+      "entity_name": "Bệnh viện Chợ Rẫy",
+      "level": 0,
+      "path": "/1/",
+      "has_children": true,
+      "children": [
+        {
+          "entity_id": 2,
+          "entity_code": "DP-001",
+          "entity_name": "Khoa Nội",
+          "level": 1,
+          "path": "/1/2/",
+          "has_children": true,
+          "children": [
+            {
+              "entity_id": 3,
+              "entity_code": "RM-001",
+              "entity_name": "Phòng 101",
+              "level": 2,
+              "path": "/1/2/3/",
+              "has_children": false
+            }
+          ]
+        },
+        {
+          "entity_id": 4,
+          "entity_code": "DP-002",
+          "entity_name": "Khoa Ngoại",
+          "level": 1,
+          "path": "/1/4/",
+          "has_children": false
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Request 2: Lấy breadcrumb (ancestors)**
+```json
+GET /api/entities/3/ancestors
+
+Response:
+{
+  "success": true,
+  "data": [
+    {
+      "entity_id": 1,
+      "entity_code": "HS-001",
+      "entity_name": "Bệnh viện Chợ Rẫy",
+      "level": 0,
+      "type_name": "Hospital"
+    },
+    {
+      "entity_id": 2,
+      "entity_code": "DP-001",
+      "entity_name": "Khoa Nội",
+      "level": 1,
+      "type_name": "Department"
+    },
+    {
+      "entity_id": 3,
+      "entity_code": "RM-001",
+      "entity_name": "Phòng 101",
+      "level": 2,
+      "type_name": "Room"
+    }
+  ],
+  "breadcrumb": "Bệnh viện Chợ Rẫy → Khoa Nội → Phòng 101"
+}
+```
+
+**Request 3: Di chuyển entity**
+```json
+POST /api/entities/3/move
+{
+  "new_parent_id": 4,  // Di chuyển Room 101 từ Khoa Nội sang Khoa Ngoại
+  "reason": "Sắp xếp lại tổ chức"
+}
+
+Response:
+{
+  "success": true,
+  "message": "Di chuyển thành công",
+  "data": {
+    "entity_id": 3,
+    "old_parent": {
+      "entity_id": 2,
+      "entity_name": "Khoa Nội"
+    },
+    "new_parent": {
+      "entity_id": 4,
+      "entity_name": "Khoa Ngoại"
+    },
+    "old_path": "/1/2/3/",
+    "new_path": "/1/4/3/",
+    "old_level": 2,
+    "new_level": 2,
+    "descendants_updated": 5
+  }
+}
+```
+
+**Request 4: Lấy tất cả descendants**
+```json
+GET /api/entities/1/descendants?max_level=2
+
+Response:
+{
+  "success": true,
+  "data": {
+    "total": 15,
+    "entities": [
+      {
+        "entity_id": 2,
+        "entity_code": "DP-001",
+        "entity_name": "Khoa Nội",
+        "level": 1,
+        "distance_from_root": 1
+      },
+      {
+        "entity_id": 3,
+        "entity_code": "RM-001",
+        "entity_name": "Phòng 101",
+        "level": 2,
+        "distance_from_root": 2
+      }
+      // ... more entities
+    ]
+  }
+}
+```
+
+### 6.7. Luồng nghiệp vụ "Di chuyển Entity"
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant UI as Frontend
+    participant API as API
+    participant SVC as TreeService
+    participant DB as Database
+    
+    U->>UI: Chọn entity cần di chuyển
+    U->>UI: Chọn parent mới
+    UI->>API: POST /api/entities/{id}/move
+    API->>SVC: moveEntity(entity_id, new_parent_id)
+    
+    SVC->>DB: Get current entity
+    DB->>SVC: entity data
+    
+    SVC->>DB: Get new parent
+    DB->>SVC: new_parent data
+    
+    SVC->>SVC: Validate: new_parent không phải child của entity
+    SVC->>SVC: Check circular reference
+    
+    alt Circular reference detected
+        SVC->>API: Error: Cannot move
+        API->>UI: Error response
+        UI->>U: Thông báo lỗi
+    else Valid move
+        SVC->>DB: BEGIN TRANSACTION
+        
+        SVC->>DB: Get all descendants của entity
+        DB->>SVC: List of descendants
+        
+        SVC->>SVC: Calculate new_path = parent.path + entity_id + '/'
+        SVC->>SVC: Calculate new_level = parent.level + 1
+        
+        SVC->>DB: UPDATE entity SET parent_id, path, level
+        
+        loop For each descendant
+            SVC->>SVC: new_desc_path = REPLACE(desc.path, old_path, new_path)
+            SVC->>SVC: new_desc_level = desc.level + level_diff
+            SVC->>DB: UPDATE descendant
+        end
+        
+        SVC->>DB: COMMIT
+        DB->>SVC: Success
+        SVC->>API: Updated entity + stats
+        API->>UI: Success response
+        UI->>U: Hiển thị "Di chuyển thành công"
+    end
+```
+
+### 6.8. Query Examples
 
 **Query 1: Cây với Recursive CTE**
 ```sql
@@ -1172,6 +1382,143 @@ SELECT
     display_path
 FROM entity_tree
 ORDER BY path;
+```
+
+**Query 2: Lấy tất cả descendants (dùng Materialized Path)**
+```sql
+-- Nhanh hơn Recursive CTE cho read-heavy workload
+SELECT 
+    e.*,
+    LENGTH(e.path) - LENGTH(REPLACE(e.path, '/', '')) - 1 as distance_from_root
+FROM entities e
+WHERE e.path LIKE CONCAT(
+    (SELECT path FROM entities WHERE entity_id = ?), 
+    '%'
+)
+AND e.entity_id != ?
+ORDER BY e.path;
+```
+
+**Query 3: Lấy ancestors (breadcrumb)**
+```sql
+-- Dùng Materialized Path
+SELECT 
+    e.*,
+    et.type_name,
+    et.icon
+FROM entities target
+JOIN entities e ON target.path LIKE CONCAT(e.path, '%')
+JOIN entity_types et ON e.entity_type_id = et.entity_type_id
+WHERE target.entity_id = ?
+ORDER BY e.level;
+```
+
+**Query 4: Lấy children trực tiếp**
+```sql
+SELECT 
+    e.*,
+    et.type_name,
+    et.icon,
+    et.color,
+    COUNT(child.entity_id) as children_count
+FROM entities e
+JOIN entity_types et ON e.entity_type_id = et.entity_type_id
+LEFT JOIN entities child ON child.parent_id = e.entity_id AND child.is_active = 1
+WHERE e.parent_id = ?
+AND e.is_active = 1
+GROUP BY e.entity_id
+ORDER BY e.sort_order, e.entity_name;
+```
+
+**Query 5: Check circular reference trước khi di chuyển**
+```sql
+-- Kiểm tra xem new_parent có phải là descendant của entity không
+SELECT COUNT(*) as is_circular
+FROM entities
+WHERE entity_id = ?  -- new_parent_id
+AND path LIKE CONCAT(
+    (SELECT path FROM entities WHERE entity_id = ?),  -- entity_id đang di chuyển
+    '%'
+);
+-- Nếu is_circular > 0 → ERROR
+```
+
+**Query 6: Update path sau khi di chuyển**
+```sql
+-- 1. Lấy thông tin cần thiết
+SET @old_path = (SELECT path FROM entities WHERE entity_id = ?);
+SET @new_parent_path = (SELECT path FROM entities WHERE entity_id = ?);
+SET @new_path = CONCAT(@new_parent_path, ?, '/');
+SET @level_diff = (SELECT level FROM entities WHERE entity_id = ?) 
+                  - (SELECT level FROM entities WHERE entity_id = ?);
+
+-- 2. Update entity chính
+UPDATE entities 
+SET 
+    parent_id = ?,
+    path = @new_path,
+    level = level + @level_diff,
+    updated_at = NOW()
+WHERE entity_id = ?;
+
+-- 3. Update tất cả descendants
+UPDATE entities
+SET 
+    path = CONCAT(@new_path, SUBSTRING(path, LENGTH(@old_path) + 1)),
+    level = level + @level_diff,
+    updated_at = NOW()
+WHERE path LIKE CONCAT(@old_path, '%')
+AND entity_id != ?;
+```
+
+### 6.9. Dữ liệu mẫu
+
+```sql
+-- Tạo cấu trúc cây: Hospital → Department → Room → Bed
+
+-- Hospital (Root)
+INSERT INTO entities 
+(entity_type_id, entity_code, entity_name, parent_id, path, level) 
+VALUES
+(1, 'HS-001', 'Bệnh viện Chợ Rẫy', NULL, '/1/', 0);
+
+-- Departments (Level 1)
+INSERT INTO entities 
+(entity_type_id, entity_code, entity_name, parent_id, path, level) 
+VALUES
+(2, 'DP-001', 'Khoa Nội', 1, '/1/2/', 1),
+(2, 'DP-002', 'Khoa Ngoại', 1, '/1/3/', 1),
+(2, 'DP-003', 'Khoa Nhi', 1, '/1/4/', 1);
+
+-- Rooms (Level 2)
+INSERT INTO entities 
+(entity_type_id, entity_code, entity_name, parent_id, path, level) 
+VALUES
+(3, 'RM-101', 'Phòng 101', 2, '/1/2/5/', 2),
+(3, 'RM-102', 'Phòng 102', 2, '/1/2/6/', 2),
+(3, 'RM-201', 'Phòng 201', 3, '/1/3/7/', 2);
+
+-- Beds (Level 3)
+INSERT INTO entities 
+(entity_type_id, entity_code, entity_name, parent_id, path, level) 
+VALUES
+(4, 'BED-101-01', 'Giường 01 - P101', 5, '/1/2/5/8/', 3),
+(4, 'BED-101-02', 'Giường 02 - P101', 5, '/1/2/5/9/', 3),
+(4, 'BED-102-01', 'Giường 01 - P102', 6, '/1/2/6/10/', 3);
+```
+
+**Output hiển thị cây:**
+```
+└─ HS-001: Bệnh viện Chợ Rẫy
+   ├─ DP-001: Khoa Nội
+   │  ├─ RM-101: Phòng 101
+   │  │  ├─ BED-101-01: Giường 01 - P101
+   │  │  └─ BED-101-02: Giường 02 - P101
+   │  └─ RM-102: Phòng 102
+   │     └─ BED-102-01: Giường 01 - P102
+   ├─ DP-002: Khoa Ngoại
+   │  └─ RM-201: Phòng 201
+   └─ DP-003: Khoa Nhi
 ```
 
 ---
