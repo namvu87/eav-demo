@@ -173,7 +173,9 @@ class EntityTypeController extends Controller
     public function getAttributes($id)
     {
         $entityType = EntityType::with(['attributes' => function($query) {
-            $query->with('options')->orderBy('sort_order');
+            $query->with(['options' => function($optionQuery) {
+                $optionQuery->orderBy('sort_order');
+            }])->orderBy('sort_order');
         }])->findOrFail($id);
 
         return response()->json([

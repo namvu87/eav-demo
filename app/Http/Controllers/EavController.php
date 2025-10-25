@@ -136,7 +136,7 @@ class EavController extends Controller
             $this->eavService->saveEntityWithAttributes($entity, $request->get('attributes', []));
 
             return redirect()->route('eav.show', $entity->entity_id)
-                ->with('success', 'Entity created successfully.');
+                ->with('success', 'Thực thể đã được tạo thành công.');
 
         } catch (\Exception $e) {
             return back()->withErrors(['error' => $e->getMessage()])->withInput();
@@ -237,7 +237,7 @@ class EavController extends Controller
             $this->eavService->saveEntityWithAttributes($entity, $request->get('attributes', []));
 
             return redirect()->route('eav.show', $entity->entity_id)
-                ->with('success', 'Entity updated successfully.');
+                ->with('success', 'Thực thể đã được cập nhật thành công.');
 
         } catch (\Exception $e) {
             return back()->withErrors(['error' => $e->getMessage()])->withInput();
@@ -260,7 +260,7 @@ class EavController extends Controller
             $entity->delete();
 
             return redirect()->route('eav.index')
-                ->with('success', 'Entity deleted successfully.');
+                ->with('success', 'Thực thể đã được xóa thành công.');
 
         } catch (\Exception $e) {
             return back()->withErrors(['error' => $e->getMessage()]);
@@ -304,5 +304,17 @@ class EavController extends Controller
         $entities = $query->get();
 
         return response()->json(['entities' => $entities]);
+    }
+
+    /**
+     * Count entities by entity type
+     */
+    public function count(Request $request)
+    {
+        $entityTypeId = $request->get('entity_type_id');
+        
+        $count = Entity::where('entity_type_id', $entityTypeId)->count();
+        
+        return response()->json(['count' => $count]);
     }
 }

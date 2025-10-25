@@ -119,8 +119,8 @@ class AttributeController extends Controller
             }
         }
 
-        return redirect()->route('attributes.show', $attribute->attribute_id)
-            ->with('success', 'Attribute created successfully.');
+        return redirect()->route('attributes.index')
+            ->with('success', 'Thuộc tính đã được tạo thành công.');
     }
 
     /**
@@ -206,8 +206,8 @@ class AttributeController extends Controller
             }
         }
 
-        return redirect()->route('attributes.show', $attribute->attribute_id)
-            ->with('success', 'Attribute updated successfully.');
+        return redirect()->route('attributes.index')
+            ->with('success', 'Thuộc tính đã được cập nhật thành công.');
     }
 
     /**
@@ -219,12 +219,12 @@ class AttributeController extends Controller
         
         // Check if attribute has values
         if ($attribute->hasValues()) {
-            return back()->withErrors(['error' => 'Cannot delete attribute with existing values.']);
+            return back()->withErrors(['error' => 'Không thể xóa thuộc tính có giá trị hiện tại.']);
         }
 
         $attribute->delete();
 
         return redirect()->route('attributes.index')
-            ->with('success', 'Attribute deleted successfully.');
+            ->with('success', 'Thuộc tính đã được xóa thành công.');
     }
 }

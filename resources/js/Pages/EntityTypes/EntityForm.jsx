@@ -23,23 +23,49 @@ export default function EntityForm({ entityTypes, entityTypeId, entity = null })
         attributes: entity?.attributes || {}
     });
 
+    // Auto-generate entity code when entity type changes
+    const generateEntityCode = async (entityTypeId) => {
+        try {
+            const response = await fetch(`/api/entity-types/${entityTypeId}`);
+            const data = await response.json();
+            const entityType = data.entityType || data;
+            
+            if (entityType.code_prefix) {
+                // Find the next available number
+                const countResponse = await fetch(`/api/entities/count?entity_type_id=${entityTypeId}`);
+                const countData = await countResponse.json();
+                const count = countData.count || 0;
+                
+                // Generate code with zero-padded number
+                const code = `${entityType.code_prefix}-${String(count + 1).padStart(3, '0')}`;
+                setData('entity_code', code);
+            }
+        } catch (error) {
+            console.error('Error generating entity code:', error);
+        }
+    };
+
     // Load attributes when entity type changes
     useEffect(() => {
         if (selectedEntityType) {
             setLoading(true);
-            console.log('Loading attributes for entity type:', selectedEntityType);
+            
+            // Auto-generate entity code for new entities
+            if (!entity) {
+                generateEntityCode(selectedEntityType);
+            }
+            
             fetch(`/api/entity-types/${selectedEntityType}/attributes`)
                 .then(response => {
-                    console.log('API response status:', response.status);
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
                     return response.json();
                 })
                 .then(data => {
-                    console.log('API response data:', data);
-                    console.log('Attributes from API:', data.attributes);
-                    setAttributes(data.attributes || []);
+                    // API trả về trực tiếp mảng attributes, không phải object có key 'attributes'
+                    const attributesData = data.attributes || data || [];
+                    setAttributes(attributesData);
                     setData('entity_type_id', selectedEntityType);
                     
                     // Initialize attribute values if editing
@@ -48,7 +74,7 @@ export default function EntityForm({ entityTypes, entityTypeId, entity = null })
                     } else {
                         // Initialize empty values for new entity
                         const initialAttributes = {};
-                        data.attributes?.forEach(attr => {
+                        attributesData.forEach(attr => {
                             initialAttributes[attr.attribute_code] = attr.default_value || '';
                         });
                         setData('attributes', initialAttributes);
@@ -376,11 +402,7 @@ export default function EntityForm({ entityTypes, entityTypeId, entity = null })
                                                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
                                                 <p className="mt-2 text-sm text-gray-500">Đang tải attributes...</p>
                                             </div>
-                                        ) : (() => {
-                                            console.log('Rendering attributes section. Attributes count:', attributes.length);
-                                            console.log('Attributes data:', attributes);
-                                            return attributes.length > 0;
-                                        })() ? (
+                                        ) : attributes.length > 0 ? (
                                             <div className="space-y-4">
                                                 {attributes.map((attribute) => (
                                                     <div key={attribute.attribute_id} className="bg-white rounded-lg p-4 border">

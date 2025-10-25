@@ -48,6 +48,8 @@ Route::middleware(['web'])->group(function () {
     // API routes for dynamic forms
     Route::prefix('api')->group(function () {
         Route::get('/entity-types/{id}/attributes', [App\Http\Controllers\EntityTypeController::class, 'getAttributes']);
+        Route::get('/entity-types/{id}', [App\Http\Controllers\EntityTypeController::class, 'show']);
+        Route::get('/entities/count', [EavController::class, 'count']);
     });
 
     // Hierarchy management routes

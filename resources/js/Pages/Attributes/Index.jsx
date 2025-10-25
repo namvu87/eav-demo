@@ -29,7 +29,7 @@ export default function Index({ attributes, entityTypes, attributeGroups, filter
     };
 
     const handleDelete = (id) => {
-        if (confirm('Are you sure you want to delete this attribute?')) {
+        if (confirm('Bạn có chắc chắn muốn xóa thuộc tính này?')) {
             router.delete(route('attributes.destroy', id));
         }
     };
@@ -60,9 +60,9 @@ export default function Index({ attributes, entityTypes, attributeGroups, filter
                         <div className="px-4 py-5 sm:p-6">
                             <div className="flex justify-between items-center">
                                 <div>
-                                    <h1 className="text-2xl font-bold text-gray-900">Attributes</h1>
+                                    <h1 className="text-2xl font-bold text-gray-900">Thuộc tính</h1>
                                     <p className="mt-1 text-sm text-gray-500">
-                                        Manage attributes for your entity types
+                                        Quản lý các thuộc tính cho các loại thực thể
                                     </p>
                                 </div>
                                 <Link
@@ -70,7 +70,7 @@ export default function Index({ attributes, entityTypes, attributeGroups, filter
                                     className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
                                 >
                                     <PlusIcon className="h-4 w-4 mr-2" />
-                                    Add Attribute
+                                    Thêm thuộc tính
                                 </Link>
                             </div>
 
@@ -82,7 +82,7 @@ export default function Index({ attributes, entityTypes, attributeGroups, filter
                                             <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                                             <input
                                                 type="text"
-                                                placeholder="Search attributes..."
+                                                placeholder="Tìm kiếm thuộc tính..."
                                                 value={search}
                                                 onChange={(e) => setSearch(e.target.value)}
                                                 className="pl-10 pr-4 py-2 border border-gray-300 rounded-md w-full focus:ring-indigo-500 focus:border-indigo-500"
@@ -93,7 +93,7 @@ export default function Index({ attributes, entityTypes, attributeGroups, filter
                                         type="submit"
                                         className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
                                     >
-                                        Search
+                                        Tìm kiếm
                                     </button>
                                 </form>
 
@@ -102,14 +102,14 @@ export default function Index({ attributes, entityTypes, attributeGroups, filter
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700">
-                                                Entity Type
+                                                Loại thực thể
                                             </label>
                                             <select
                                                 value={entityTypeFilter}
                                                 onChange={(e) => setEntityTypeFilter(e.target.value)}
                                                 className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
                                             >
-                                                <option value="">All Types</option>
+                                                <option value="">Tất cả loại</option>
                                                 {entityTypes.map((type) => (
                                                     <option key={type.entity_type_id} value={type.entity_type_id}>
                                                         {type.type_name}
@@ -119,14 +119,14 @@ export default function Index({ attributes, entityTypes, attributeGroups, filter
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700">
-                                                Attribute Group
+                                                Nhóm thuộc tính
                                             </label>
                                             <select
                                                 value={groupFilter}
                                                 onChange={(e) => setGroupFilter(e.target.value)}
                                                 className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
                                             >
-                                                <option value="">All Groups</option>
+                                                <option value="">Tất cả nhóm</option>
                                                 {attributeGroups.map((group) => (
                                                     <option key={group.group_id} value={group.group_id}>
                                                         {group.group_name}
@@ -145,7 +145,7 @@ export default function Index({ attributes, entityTypes, attributeGroups, filter
                                                 }}
                                                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
                                             >
-                                                Clear Filters
+                                                Xóa bộ lọc
                                             </button>
                                         </div>
                                     </div>
@@ -159,19 +159,19 @@ export default function Index({ attributes, entityTypes, attributeGroups, filter
                                 <thead className="bg-gray-50">
                                     <tr>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Attribute
+                                            Thuộc tính
                                         </th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Type
+                                            Loại
                                         </th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Entity Type
+                                            Loại thực thể
                                         </th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Properties
+                                            Thuộc tính đặc biệt
                                         </th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Actions
+                                            Thao tác
                                         </th>
                                     </tr>
                                 </thead>
@@ -210,17 +210,17 @@ export default function Index({ attributes, entityTypes, attributeGroups, filter
                                                 <div className="flex flex-wrap gap-1">
                                                     {attribute.is_required && (
                                                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
-                                                            Required
+                                                            Bắt buộc
                                                         </span>
                                                     )}
                                                     {attribute.is_unique && (
                                                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                                                            Unique
+                                                            Duy nhất
                                                         </span>
                                                     )}
                                                     {attribute.is_searchable && (
                                                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                                                            Searchable
+                                                            Có thể tìm kiếm
                                                         </span>
                                                     )}
                                                 </div>
@@ -261,7 +261,7 @@ export default function Index({ attributes, entityTypes, attributeGroups, filter
                             <div className="px-4 py-3 border-t border-gray-200">
                                 <div className="flex items-center justify-between">
                                     <div className="text-sm text-gray-700">
-                                        Showing {attributes.from} to {attributes.to} of {attributes.total} results
+                                        Hiển thị {attributes.from} đến {attributes.to} trong tổng {attributes.total} kết quả
                                     </div>
                                     <div className="flex space-x-1">
                                         {attributes.links.map((link, index) => (
