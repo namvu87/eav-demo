@@ -471,4 +471,66 @@ class EavService
 
         return $query->exists();
     }
+
+    /**
+     * Get entity hierarchy tree
+     */
+    public function getEntityHierarchy($entityTypeId = null, $parentId = null)
+    {
+        $query = Entity::with(['entityType', 'children' => function($query) {
+            $query->with(['entityType', 'children'])->orderBy('sort_order')->orderBy('entity_name');
+        }])
+        ->orderBy('sort_order')
+        ->orderBy('entity_name');
+
+        if ($entityTypeId) {
+            $query->where('entity_type_id', $entityTypeId);
+        }
+
+        if ($parentId) {
+            $query->where('parent_id', $parentId);
+        } else {
+            $query->whereNull('parent_id');
+        }
+
+        return $query->get();
+    }
+
+
+    /**
+     * Check if entity is descendant of another entity
+     */
+    private function isDescendant($entity, $ancestor)
+    {
+        if ($entity->parent_id === $ancestor->entity_id) {
+            return true;
+        }
+        
+        if ($entity->parent_id) {
+            $parent = Entity::find($entity->parent_id);
+            return $this->isDescendant($parent, $ancestor);
+        }
+        
+        return false;
+    }
+
+    /**
+     * Get entity path (breadcrumb)
+     */
+    public function getEntityPath($entityId)
+    {
+        $entity = Entity::with('entityType')->findOrFail($entityId);
+        $path = [$entity];
+        
+        while ($entity->parent_id) {
+            $entity = Entity::with('entityType')->find($entity->parent_id);
+            if ($entity) {
+                array_unshift($path, $entity);
+            } else {
+                break;
+            }
+        }
+        
+        return $path;
+    }
 }

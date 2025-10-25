@@ -42,6 +42,7 @@ class HandleInertiaRequests extends Middleware
                 'error' => fn () => $request->session()->get('error'),
             ],
             'csrf_token' => csrf_token(),
+            // 'ziggy' => fn () => (new \Tightenco\Ziggy\Ziggy)->toArray(),
         ]);
     }
 }

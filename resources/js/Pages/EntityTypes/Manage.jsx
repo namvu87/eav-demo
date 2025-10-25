@@ -7,21 +7,18 @@ import {
     PencilIcon, 
     TrashIcon,
     EyeIcon,
-    FunnelIcon
+    Cog6ToothIcon,
+    ChevronRightIcon
 } from '@heroicons/react/24/outline';
 
-export default function Index({ entities, entityTypes, filters }) {
-    const [search, setSearch] = useState(filters.search || '');
-    const [entityTypeFilter, setEntityTypeFilter] = useState(filters.entity_type_id || '');
-    const [parentFilter, setParentFilter] = useState(filters.parent_id || '');
+export default function Manage({ entityType, entities }) {
+    const [search, setSearch] = useState('');
     const [showFilters, setShowFilters] = useState(false);
 
     const handleSearch = (e) => {
         e.preventDefault();
-        router.get(route('eav.index'), {
-            search,
-            entity_type_id: entityTypeFilter,
-            parent_id: parentFilter
+        router.get(route('entity-types.manage', entityType.entity_type_id), {
+            search
         }, {
             preserveState: true,
             replace: true
@@ -34,46 +31,58 @@ export default function Index({ entities, entityTypes, filters }) {
         }
     };
 
-    const clearFilters = () => {
-        setSearch('');
-        setEntityTypeFilter('');
-        setParentFilter('');
-        router.get(route('eav.index'));
+    const getAttributeIcon = (backendType) => {
+        switch (backendType) {
+            case 'varchar':
+            case 'text':
+                return '📝';
+            case 'int':
+            case 'decimal':
+                return '🔢';
+            case 'datetime':
+                return '📅';
+            case 'file':
+                return '📎';
+            default:
+                return '📋';
+        }
     };
 
     return (
-        <AppLayout title="EAV Entities">
+        <AppLayout title={`Manage ${entityType.type_name} - EAV`}>
             <div className="min-h-screen bg-gray-50">
                 <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-                    <div className="bg-white shadow rounded-lg">
-                        {/* Header */}
+                    {/* Header */}
+                    <div className="bg-white shadow rounded-lg mb-6">
                         <div className="px-4 py-5 sm:p-6">
                             <div className="flex justify-between items-center">
                                 <div>
-                                    <h1 className="text-2xl font-bold text-gray-900">EAV Entities</h1>
+                                    <h1 className="text-2xl font-bold text-gray-900">
+                                        Manage {entityType.type_name}
+                                    </h1>
                                     <p className="mt-1 text-sm text-gray-500">
-                                        Manage your EAV entities and their attributes
+                                        {entityType.description || 'Manage entities of this type'}
                                     </p>
                                 </div>
                                 <div className="flex space-x-3">
-                                    <button
-                                        onClick={() => setShowFilters(!showFilters)}
+                                    <Link
+                                        href={route('entity-types.show', entityType.entity_type_id)}
                                         className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
                                     >
-                                        <FunnelIcon className="h-4 w-4 mr-2" />
-                                        Filters
-                                    </button>
+                                        <Cog6ToothIcon className="h-4 w-4 mr-2" />
+                                        Configure
+                                    </Link>
                                     <Link
-                                        href={route('eav.create')}
+                                        href={route('eav.create', { entity_type_id: entityType.entity_type_id })}
                                         className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
                                     >
                                         <PlusIcon className="h-4 w-4 mr-2" />
-                                        Add Entity
+                                        Add {entityType.type_name}
                                     </Link>
                                 </div>
                             </div>
 
-                            {/* Search and Filters */}
+                            {/* Search */}
                             <div className="mt-6">
                                 <form onSubmit={handleSearch} className="flex space-x-4">
                                     <div className="flex-1">
@@ -81,7 +90,7 @@ export default function Index({ entities, entityTypes, filters }) {
                                             <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                                             <input
                                                 type="text"
-                                                placeholder="Search entities..."
+                                                placeholder={`Search ${entityType.type_name.toLowerCase()}...`}
                                                 value={search}
                                                 onChange={(e) => setSearch(e.target.value)}
                                                 className="pl-10 pr-4 py-2 border border-gray-300 rounded-md w-full focus:ring-indigo-500 focus:border-indigo-500"
@@ -95,56 +104,47 @@ export default function Index({ entities, entityTypes, filters }) {
                                         Search
                                     </button>
                                 </form>
-
-                                {/* Advanced Filters */}
-                                {showFilters && (
-                                    <div className="mt-4 p-4 bg-gray-50 rounded-md">
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700">
-                                                    Entity Type
-                                                </label>
-                                                <select
-                                                    value={entityTypeFilter}
-                                                    onChange={(e) => setEntityTypeFilter(e.target.value)}
-                                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                                                >
-                                                    <option value="">All Types</option>
-                                                    {entityTypes.map((type) => (
-                                                        <option key={type.entity_type_id} value={type.entity_type_id}>
-                                                            {type.type_name}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700">
-                                                    Parent Entity
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    placeholder="Parent ID"
-                                                    value={parentFilter}
-                                                    onChange={(e) => setParentFilter(e.target.value)}
-                                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                                                />
-                                            </div>
-                                            <div className="flex items-end">
-                                                <button
-                                                    type="button"
-                                                    onClick={clearFilters}
-                                                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-                                                >
-                                                    Clear Filters
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
                             </div>
                         </div>
+                    </div>
 
-                        {/* Entities Table */}
+                    {/* Attributes Info */}
+                    {entityType.attributes && entityType.attributes.length > 0 && (
+                        <div className="bg-white shadow rounded-lg mb-6">
+                            <div className="px-4 py-5 sm:p-6">
+                                <h2 className="text-lg font-medium text-gray-900 mb-4">
+                                    Available Attributes
+                                </h2>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {entityType.attributes.map((attribute) => (
+                                        <div key={attribute.attribute_id} className="bg-gray-50 rounded-lg p-3">
+                                            <div className="flex items-start space-x-2">
+                                                <span className="text-lg">
+                                                    {getAttributeIcon(attribute.backend_type)}
+                                                </span>
+                                                <div className="flex-1 min-w-0">
+                                                    <h3 className="text-sm font-medium text-gray-900">
+                                                        {attribute.attribute_label}
+                                                    </h3>
+                                                    <p className="text-xs text-gray-500">
+                                                        {attribute.attribute_code} • {attribute.backend_type}
+                                                    </p>
+                                                    {attribute.is_required && (
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 mt-1">
+                                                            Required
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Entities Table */}
+                    <div className="bg-white shadow rounded-lg">
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200">
                                 <thead className="bg-gray-50">
@@ -153,13 +153,13 @@ export default function Index({ entities, entityTypes, filters }) {
                                             Entity
                                         </th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Type
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             Parent
                                         </th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             Status
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Created
                                         </th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             Actions
@@ -186,11 +186,6 @@ export default function Index({ entities, entityTypes, filters }) {
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <span className="text-sm text-gray-900">
-                                                    {entity.entity_type?.type_name || 'N/A'}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className="text-sm text-gray-900">
                                                     {entity.parent?.entity_name || 'Root'}
                                                 </span>
                                             </td>
@@ -203,23 +198,29 @@ export default function Index({ entities, entityTypes, filters }) {
                                                     {entity.is_active ? 'Active' : 'Inactive'}
                                                 </span>
                                             </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                {new Date(entity.created_at).toLocaleDateString()}
+                                            </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                 <div className="flex space-x-2">
                                                     <Link
                                                         href={route('eav.show', entity.entity_id)}
                                                         className="text-indigo-600 hover:text-indigo-900"
+                                                        title="View"
                                                     >
                                                         <EyeIcon className="h-4 w-4" />
                                                     </Link>
                                                     <Link
                                                         href={route('eav.edit', entity.entity_id)}
                                                         className="text-yellow-600 hover:text-yellow-900"
+                                                        title="Edit"
                                                     >
                                                         <PencilIcon className="h-4 w-4" />
                                                     </Link>
                                                     <button
                                                         onClick={() => handleDelete(entity.entity_id)}
                                                         className="text-red-600 hover:text-red-900"
+                                                        title="Delete"
                                                     >
                                                         <TrashIcon className="h-4 w-4" />
                                                     </button>
