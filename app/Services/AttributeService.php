@@ -4,10 +4,17 @@ namespace App\Services;
 
 use App\Models\Attribute;
 use App\Models\AttributeOption;
+use App\Repositories\AttributeRepository;
 use Illuminate\Support\Facades\DB;
 
 class AttributeService
 {
+    protected $repository;
+    
+    public function __construct(AttributeRepository $repository)
+    {
+        $this->repository = $repository;
+    }
     /**
      * Create a new attribute with its options
      */
@@ -116,10 +123,7 @@ class AttributeService
      */
     public function getAttributesByEntityType($entityTypeId)
     {
-        return Attribute::where('entity_type_id', $entityTypeId)
-            ->with('options')
-            ->orderBy('sort_order')
-            ->get();
+        return $this->repository->getByEntityType($entityTypeId);
     }
 
     /**
@@ -127,23 +131,6 @@ class AttributeService
      */
     public function getAllAttributes(array $filters = [])
     {
-        $query = Attribute::with(['entityType', 'group', 'options']);
-        
-        if (isset($filters['entity_type_id'])) {
-            $query->where('entity_type_id', $filters['entity_type_id']);
-        }
-        
-        if (isset($filters['group_id'])) {
-            $query->where('group_id', $filters['group_id']);
-        }
-        
-        if (isset($filters['search'])) {
-            $query->where(function($q) use ($filters) {
-                $q->where('attribute_code', 'like', '%' . $filters['search'] . '%')
-                  ->orWhere('attribute_label', 'like', '%' . $filters['search'] . '%');
-            });
-        }
-        
-        return $query->orderBy('sort_order')->paginate(15);
+        return $this->repository->getWithFilters($filters);
     }
 }

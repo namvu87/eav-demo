@@ -5,12 +5,20 @@ namespace App\Http\Controllers;
 use App\Models\EntityType;
 use App\Models\Attribute;
 use App\Models\AttributeGroup;
+use App\Repositories\AttributeRepository;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Validator;
 
 class EntityTypeController extends Controller
 {
+    protected $attributeRepository;
+    
+    public function __construct(AttributeRepository $attributeRepository)
+    {
+        $this->attributeRepository = $attributeRepository;
+    }
+
     /**
      * Display a listing of entity types
      */
@@ -172,15 +180,14 @@ class EntityTypeController extends Controller
      */
     public function getAttributes($id)
     {
-        $entityType = EntityType::with(['attributes' => function($query) {
-            $query->with(['options' => function($optionQuery) {
-                $optionQuery->orderBy('sort_order');
-            }])->orderBy('sort_order');
-        }])->findOrFail($id);
+        $entityType = EntityType::findOrFail($id);
+        
+        // Use repository to get attributes
+        $attributes = $this->attributeRepository->getByEntityType($id);
 
         return response()->json([
             'entity_type' => $entityType,
-            'attributes' => $entityType->attributes
+            'attributes' => $attributes
         ]);
     }
 }

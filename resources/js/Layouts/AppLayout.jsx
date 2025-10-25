@@ -7,7 +7,8 @@ import {
     BuildingOfficeIcon,
     WrenchScrewdriverIcon,
     DocumentTextIcon,
-    Cog6ToothIcon
+    Cog6ToothIcon,
+    Squares2X2Icon
 } from '@heroicons/react/24/outline';
 
 export default function AppLayout({ children, title }) {
@@ -18,6 +19,7 @@ export default function AppLayout({ children, title }) {
         { name: 'Entity Types', href: '/entity-types', icon: BuildingOfficeIcon },
         { name: 'Attributes', href: '/attributes', icon: WrenchScrewdriverIcon },
         { name: 'Entities', href: '/eav', icon: DocumentTextIcon },
+        { name: 'Hierarchy', href: '/hierarchy', icon: Squares2X2Icon },
     ];
 
     return (
