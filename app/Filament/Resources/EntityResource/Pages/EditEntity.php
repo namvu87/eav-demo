@@ -42,29 +42,17 @@ class EditEntity extends EditRecord
 
     protected function mutateFormDataBeforeFill(array $data): array
     {
-        // Load attribute values
-        $eavService = app(EavService::class);
+        $entity = $this->record;
 
-        $attributes = Attribute::where(function($query) {
-            $query->where('entity_type_id', $this->record->entity_type_id)
-                ->orWhereNull('entity_type_id');
-        })
-            ->get();
+        // Load all attribute values
+        $valueTypes = ['varchar', 'text', 'int', 'decimal', 'datetime'];
 
-        foreach ($attributes as $attribute) {
-            $fieldKey = 'attr_' . $attribute->attribute_id;
-            $valueModel = $this->getValueModel($attribute->backend_type);
+        foreach ($valueTypes as $type) {
+            $relation = 'values' . ucfirst($type);
+            $values = $entity->$relation()->get();
 
-            $valueRecord = $valueModel::where('entity_id', $this->record->entity_id)
-                ->where('attribute_id', $attribute->attribute_id)
-                ->first();
-
-            if ($valueRecord) {
-                if ($attribute->backend_type === 'file') {
-                    $data[$fieldKey] = [$valueRecord->file_path];
-                } else {
-                    $data[$fieldKey] = $valueRecord->value;
-                }
+            foreach ($values as $value) {
+                $data['attr_' . $value->attribute_id] = $value->value;
             }
         }
 
@@ -73,17 +61,22 @@ class EditEntity extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        // Extract attribute data
-        $this->attributeData = [];
+        $attributeData = [];
+        $coreData = [];
 
         foreach ($data as $key => $value) {
             if (strpos($key, 'attr_') === 0) {
-                $this->attributeData[$key] = $value;
-                unset($data[$key]);
+                $attributeData[$key] = $value;
+            } else {
+                $coreData[$key] = $value;
             }
         }
 
-        return $data;
+        // Save attributes using EavService
+        $eavService = app(EavService::class);
+        $eavService->saveEntityWithAttributes($this->record, $attributeData);
+
+        return $coreData;
     }
 
     protected function afterSave(): void

@@ -143,10 +143,10 @@ class EntityResource extends Resource
             'text' => Forms\Components\TextInput::make($fieldName),
             'textarea' => Forms\Components\Textarea::make($fieldName)->rows(3),
             'select' => Forms\Components\Select::make($fieldName)
-                ->options($attribute->options->pluck('values.0.value', 'option_id')),
+                ->options(self::getAttributeOptions($attribute)),
             'multiselect' => Forms\Components\Select::make($fieldName)
                 ->multiple()
-                ->options($attribute->options->pluck('values.0.value', 'option_id')),
+                ->options(self::getAttributeOptions($attribute)),
             'date' => Forms\Components\DatePicker::make($fieldName),
             'datetime' => Forms\Components\DateTimePicker::make($fieldName),
             'yesno' => Forms\Components\Toggle::make($fieldName),
@@ -172,6 +172,21 @@ class EntityResource extends Resource
         }
 
         return $field;
+    }
+
+    protected static function getAttributeOptions(Attribute $attribute): array
+    {
+        $options = [];
+
+        foreach ($attribute->options as $option) {
+            // Lấy value đầu tiên từ relationship values
+            $optionValue = $option->values()->first();
+            if ($optionValue) {
+                $options[$option->option_id] = $optionValue->value;
+            }
+        }
+
+        return $options;
     }
 
     protected static function generateEntityCode(?int $entityTypeId): string
