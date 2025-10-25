@@ -11,9 +11,28 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
-    ->withMiddleware(function (Middleware $middleware): void {
-        //
+    ->withMiddleware(function (Middleware $middleware) {
+        // Thêm Inertia middleware vào web group
+        $middleware->web(append: [
+            \App\Http\Middleware\HandleInertiaRequests::class,
+        ]);
+
+        // Nếu cần thêm middleware cho API CORS
+        $middleware->api(prepend: [
+            \Illuminate\Http\Middleware\HandleCors::class,
+        ]);
+
+        // Alias middleware (optional)
+        $middleware->alias([
+            'inertia' => \App\Http\Middleware\HandleInertiaRequests::class,
+            'eav.access' => \App\Http\Middleware\CheckEavAccess::class,
+
+        ]);
+
+        $middleware->statefulApi();
+
+
     })
-    ->withExceptions(function (Exceptions $exceptions): void {
+    ->withExceptions(function (Exceptions $exceptions) {
         //
     })->create();
