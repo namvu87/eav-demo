@@ -238,7 +238,11 @@ class EntityResource extends Resource
                     ->label('Name')
                     ->searchable()
                     ->sortable()
-                    ->weight('medium'),
+                    ->weight('medium')
+                    ->formatStateUsing(function ($state, $record) {
+                        $indent = str_repeat('— ', max(0, (int)($record->level ?? 0)));
+                        return $indent . $state;
+                    }),
 
                 Tables\Columns\TextColumn::make('entityType.type_name')
                     ->label('Type')
@@ -288,6 +292,28 @@ class EntityResource extends Resource
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
+                Tables\Actions\Action::make('move')
+                    ->label('Move')
+                    ->icon('heroicon-o-arrows-right-left')
+                    ->form([
+                        Forms\Components\Select::make('new_parent_id')
+                            ->label('New Parent')
+                            ->placeholder('Root (no parent)')
+                            ->nullable()
+                            ->searchable()
+                            ->options(function ($record) {
+                                // Exclude self and descendants; restrict to same type
+                                $excludeIds = $record->getDescendants()->pluck('entity_id')->push($record->entity_id)->all();
+                                return Entity::where('entity_type_id', $record->entity_type_id)
+                                    ->whereNotIn('entity_id', $excludeIds)
+                                    ->orderBy('entity_name')
+                                    ->pluck('entity_name', 'entity_id');
+                            }),
+                    ])
+                    ->action(function (Entity $record, array $data) {
+                        app(\App\Services\EavService::class)->moveEntity($record, $data['new_parent_id'] ?? null);
+                    })
+                    ->successNotificationTitle('Entity moved successfully'),
                 Tables\Actions\DeleteAction::make(),
             ])
             ->bulkActions([
@@ -295,7 +321,7 @@ class EntityResource extends Resource
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ])
-            ->defaultSort('entity_code', 'asc');
+            ->defaultSort('path', 'asc');
     }
 
     public static function getPages(): array

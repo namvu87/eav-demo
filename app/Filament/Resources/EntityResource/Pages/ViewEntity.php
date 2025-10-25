@@ -52,6 +52,14 @@ class ViewEntity extends ViewRecord
                         ->label('Path')
                         ->copyable(),
 
+                    Infolists\Components\TextEntry::make('breadcrumb')
+                        ->label('Breadcrumb')
+                        ->state(function () {
+                            $ancestors = $this->record->getAncestors();
+                            return $ancestors->pluck('entity_name')->implode(' → ');
+                        })
+                        ->columnSpanFull(),
+
                     Infolists\Components\TextEntry::make('description')
                         ->label('Description')
                         ->default('-')

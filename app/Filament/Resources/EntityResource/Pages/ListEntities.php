@@ -16,4 +16,14 @@ class ListEntities extends ListRecords
             Actions\CreateAction::make(),
         ];
     }
+
+    protected function getDefaultTableSortColumn(): ?string
+    {
+        return 'path';
+    }
+
+    protected function getDefaultTableSortDirection(): ?string
+    {
+        return 'asc';
+    }
 }

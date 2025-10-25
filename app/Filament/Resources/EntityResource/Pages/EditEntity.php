@@ -16,6 +16,28 @@ class EditEntity extends EditRecord
     {
         return [
             Actions\DeleteAction::make(),
+            Actions\Action::make('move')
+                ->label('Move')
+                ->icon('heroicon-o-arrows-right-left')
+                ->form([
+                    \Filament\Forms\Components\Select::make('new_parent_id')
+                        ->label('New Parent')
+                        ->placeholder('Root (no parent)')
+                        ->nullable()
+                        ->searchable()
+                        ->options(function () {
+                            $excludeIds = $this->record->getDescendants()->pluck('entity_id')->push($this->record->entity_id)->all();
+                            return \App\Models\Entity::where('entity_type_id', $this->record->entity_type_id)
+                                ->whereNotIn('entity_id', $excludeIds)
+                                ->orderBy('entity_name')
+                                ->pluck('entity_name', 'entity_id');
+                        }),
+                ])
+                ->action(function (array $data) {
+                    app(\App\Services\EavService::class)->moveEntity($this->record, $data['new_parent_id'] ?? null);
+                    $this->record->refresh();
+                })
+                ->successNotificationTitle('Entity moved successfully'),
             Actions\Action::make('clone')
                 ->label('Clone Entity')
                 ->icon('heroicon-o-document-duplicate')

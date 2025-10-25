@@ -22,19 +22,20 @@ class EavService
         DB::beginTransaction();
 
         try {
+            // Load original for move detection (only if updating existing entity)
+            $original = $entity->exists ? Entity::find($entity->entity_id) : null;
+
             // Save core entity fields
             $entity->save();
 
-            // Update path and level if has parent
-            if ($entity->parent_id) {
-                $parent = Entity::find($entity->parent_id);
-                $entity->level = $parent->level + 1;
-                $entity->path = $parent->path . $entity->entity_id . '/';
+            // If parent changed on update, perform a subtree move
+            if ($original && $original->parent_id !== $entity->parent_id) {
+                // Use current parent_id as target
+                $this->moveEntity($entity, $entity->parent_id);
             } else {
-                $entity->level = 0;
-                $entity->path = '/' . $entity->entity_id . '/';
+                // Ensure path/level are correct (including new entity creation)
+                $this->updateHierarchy($entity);
             }
-            $entity->save();
 
             // Save attribute values
             $attributes = Attribute::where(function($query) use ($entity) {
@@ -63,6 +64,90 @@ class EavService
             DB::rollBack();
             throw $e;
         }
+    }
+
+    /**
+     * Ensure entity has correct path and level based on current parent.
+     * Called after create/update when parent might have changed.
+     */
+    public function updateHierarchy(Entity $entity): void
+    {
+        // Reload parent to avoid stale level/path
+        $parent = $entity->parent_id ? Entity::find($entity->parent_id) : null;
+
+        if ($parent) {
+            $entity->level = ($parent->level ?? 0) + 1;
+            // If entity_id is not yet set (not saved), save first
+            if (!$entity->entity_id) {
+                $entity->save();
+            }
+            $entity->path = rtrim($parent->path, '/') . '/' . $entity->entity_id . '/';
+        } else {
+            // Root
+            if (!$entity->entity_id) {
+                $entity->save();
+            }
+            $entity->level = 0;
+            $entity->path = '/' . $entity->entity_id . '/';
+        }
+
+        $entity->save();
+    }
+
+    /**
+     * Move an entity (and its entire subtree) under a new parent.
+     * Pass null as newParentId to move to root.
+     */
+    public function moveEntity(Entity $entity, ?int $newParentId): Entity
+    {
+        return DB::transaction(function () use ($entity, $newParentId) {
+            // Validate self-move
+            if ($newParentId !== null && $newParentId === $entity->entity_id) {
+                throw new \InvalidArgumentException('Cannot move entity under itself.');
+            }
+
+            // Validate not moving under a descendant
+            $descendantIds = $entity->getDescendants()->pluck('entity_id')->all();
+            if ($newParentId !== null && in_array($newParentId, $descendantIds, true)) {
+                throw new \InvalidArgumentException('Cannot move entity under its own descendant.');
+            }
+
+            $oldPath = $entity->path;
+            $oldLevel = $entity->level ?? 0;
+
+            // Determine new parent data
+            $newParent = $newParentId ? Entity::findOrFail($newParentId) : null;
+            $newLevel = $newParent ? ($newParent->level + 1) : 0;
+            $newPath = $newParent ? (rtrim($newParent->path, '/') . '/' . $entity->entity_id . '/') : ('/' . $entity->entity_id . '/');
+
+            // Update entity core fields
+            $entity->parent_id = $newParentId;
+            $entity->level = $newLevel;
+            $entity->path = $newPath;
+            $entity->save();
+
+            // Update descendants: adjust level delta and replace path prefix
+            $levelDelta = $newLevel - $oldLevel;
+
+            // Update levels in bulk
+            DB::table('entities')
+                ->where('path', 'like', $oldPath . '%')
+                ->where('entity_id', '!=', $entity->entity_id)
+                ->update([
+                    'level' => DB::raw('level + ' . ($levelDelta >= 0 ? $levelDelta : ('(' . $levelDelta . ')'))),
+                ]);
+
+            // Replace path prefix using SQL string operations
+            // new_path_for_child = CONCAT(?, SUBSTRING(path, LENGTH(?) + 1))
+            DB::table('entities')
+                ->where('path', 'like', $oldPath . '%')
+                ->where('entity_id', '!=', $entity->entity_id)
+                ->update([
+                    'path' => DB::raw("CONCAT('" . addslashes($newPath) . "', SUBSTRING(path, " . (strlen($oldPath) + 1) . "))"),
+                ]);
+
+            return $entity->refresh();
+        });
     }
 
     /**
