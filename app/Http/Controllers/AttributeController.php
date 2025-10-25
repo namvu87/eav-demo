@@ -6,12 +6,19 @@ use App\Models\Attribute;
 use App\Models\AttributeGroup;
 use App\Models\EntityType;
 use App\Models\AttributeOption;
+use App\Services\AttributeService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Validator;
 
 class AttributeController extends Controller
 {
+    protected $attributeService;
+
+    public function __construct(AttributeService $attributeService)
+    {
+        $this->attributeService = $attributeService;
+    }
     /**
      * Display a listing of attributes
      */
@@ -103,24 +110,14 @@ class AttributeController extends Controller
             return back()->withErrors($validator)->withInput();
         }
 
-        $attribute = Attribute::create($request->all());
-
-        // Handle options for select/multiselect
-        if (in_array($request->frontend_input, ['select', 'multiselect']) && $request->has('options')) {
-            foreach ($request->options as $optionData) {
-                if (!empty($optionData['value'])) {
-                    AttributeOption::create([
-                        'attribute_id' => $attribute->attribute_id,
-                        'value' => $optionData['value'],
-                        'label' => $optionData['label'] ?? $optionData['value'],
-                        'sort_order' => $optionData['sort_order'] ?? 0
-                    ]);
-                }
-            }
+        try {
+            $this->attributeService->createAttribute($request->all());
+            
+            return redirect()->route('attributes.index')
+                ->with('success', 'Thuộc tính đã được tạo thành công.');
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => $e->getMessage()])->withInput();
         }
-
-        return redirect()->route('attributes.index')
-            ->with('success', 'Thuộc tính đã được tạo thành công.');
     }
 
     /**
@@ -186,28 +183,14 @@ class AttributeController extends Controller
             return back()->withErrors($validator)->withInput();
         }
 
-        $attribute->update($request->all());
-
-        // Handle options for select/multiselect
-        if (in_array($request->frontend_input, ['select', 'multiselect']) && $request->has('options')) {
-            // Delete existing options
-            $attribute->options()->delete();
+        try {
+            $this->attributeService->updateAttribute($attribute, $request->all());
             
-            // Create new options
-            foreach ($request->options as $optionData) {
-                if (!empty($optionData['value'])) {
-                    AttributeOption::create([
-                        'attribute_id' => $attribute->attribute_id,
-                        'value' => $optionData['value'],
-                        'label' => $optionData['label'] ?? $optionData['value'],
-                        'sort_order' => $optionData['sort_order'] ?? 0
-                    ]);
-                }
-            }
+            return redirect()->route('attributes.index')
+                ->with('success', 'Thuộc tính đã được cập nhật thành công.');
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => $e->getMessage()])->withInput();
         }
-
-        return redirect()->route('attributes.index')
-            ->with('success', 'Thuộc tính đã được cập nhật thành công.');
     }
 
     /**
@@ -217,14 +200,13 @@ class AttributeController extends Controller
     {
         $attribute = Attribute::findOrFail($id);
         
-        // Check if attribute has values
-        if ($attribute->hasValues()) {
-            return back()->withErrors(['error' => 'Không thể xóa thuộc tính có giá trị hiện tại.']);
+        try {
+            $this->attributeService->deleteAttribute($attribute);
+            
+            return redirect()->route('attributes.index')
+                ->with('success', 'Thuộc tính đã được xóa thành công.');
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
         }
-
-        $attribute->delete();
-
-        return redirect()->route('attributes.index')
-            ->with('success', 'Thuộc tính đã được xóa thành công.');
     }
 }

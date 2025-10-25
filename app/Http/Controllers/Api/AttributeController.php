@@ -6,11 +6,18 @@ use App\Http\Controllers\Controller;
 use App\Models\Attribute;
 use App\Models\AttributeOption;
 use App\Models\AttributeOptionValue;
+use App\Services\AttributeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class AttributeController extends Controller
 {
+    protected $attributeService;
+
+    public function __construct(AttributeService $attributeService)
+    {
+        $this->attributeService = $attributeService;
+    }
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -50,25 +57,12 @@ class AttributeController extends Controller
             return response()->json(['success' => false, 'message' => 'Attribute code already exists'], 422);
         }
 
-        return DB::transaction(function () use ($data) {
-            $attribute = Attribute::create($data);
-
-            if (!empty($data['options']) && in_array($attribute->frontend_input, ['select', 'multiselect'])) {
-                foreach ($data['options'] as $i => $opt) {
-                    $option = AttributeOption::create([
-                        'attribute_id' => $attribute->attribute_id,
-                        'sort_order' => $i + 1,
-                        'is_default' => (bool)($opt['is_default'] ?? false),
-                    ]);
-                    AttributeOptionValue::create([
-                        'option_id' => $option->option_id,
-                        'value' => $opt['label'],
-                    ]);
-                }
-            }
-
-            return response()->json(['success' => true, 'data' => $attribute], 201);
-        });
+        try {
+            $attribute = $this->attributeService->createAttribute($data);
+            return response()->json(['success' => true, 'data' => $attribute->load('options')], 201);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
     }
 
     public function listByType(int $typeId)
@@ -112,18 +106,28 @@ class AttributeController extends Controller
             'sort_order' => ['nullable', 'integer'],
             'group_id' => ['nullable', 'integer', 'exists:attribute_groups,group_id'],
         ]);
-        $attribute->update($data);
-        return response()->json(['success' => true, 'data' => $attribute]);
+        try {
+            $this->attributeService->updateAttribute($attribute, $data);
+            return response()->json(['success' => true, 'data' => $attribute->fresh()->load('options')]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
     }
 
     public function destroy(int $id)
     {
         $attribute = Attribute::findOrFail($id);
+        
         if ($attribute->is_system) {
-            return response()->json(['success' => false, 'message' => 'Cannot delete system attribute'], 422);
+            return response()->json(['success' => false, 'message' => 'Không thể xóa thuộc tính hệ thống'], 422);
         }
-        $attribute->delete();
-        return response()->json(['success' => true]);
+        
+        try {
+            $this->attributeService->deleteAttribute($attribute);
+            return response()->json(['success' => true, 'message' => 'Đã xóa thành công']);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
     }
 
     public function addOption(Request $request, int $id)
