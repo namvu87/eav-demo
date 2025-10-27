@@ -285,6 +285,9 @@
 
 <script>
 const attributes = @json($attributes);
+const entityTypes = @json($entityTypes);
+const oldValues = @json(old());
+const errorsData = @json($errors->getMessages());
 
 function updateAttributes() {
     const entityTypeId = document.getElementById('entity_type_id').value;
@@ -298,7 +301,7 @@ function updateAttributes() {
     }
     
     // Find selected entity type name
-    const selectedType = @json($entityTypes)->find(type => type.entity_type_id == entityTypeId);
+    const selectedType = entityTypes.find(type => type.entity_type_id == entityTypeId);
     if (selectedType) {
         selectedTypeName.textContent = selectedType.type_name;
     }
@@ -329,9 +332,8 @@ function updateAttributes() {
 
 function generateAttributeField(attribute) {
     const fieldName = `attr_${attribute.attribute_id}`;
-    const oldValue = @json(old());
-    const value = oldValue[fieldName] || '';
-    const errorClass = @json($errors->has('attr_' . $attribute->attribute_id)) ? 'border-red-300' : '';
+    const value = oldValues[fieldName] || '';
+    const errorClass = errorsData[fieldName] ? 'border-red-300' : '';
     
     let fieldHtml = `
         <div class="space-y-2">
@@ -461,6 +463,11 @@ function generateAttributeField(attribute) {
         fieldHtml += `<p class="text-xs text-gray-500">${attribute.help_text}</p>`;
     }
     
+    // Add error message if exists
+    if (errorsData[fieldName]) {
+        fieldHtml += `<p class="text-xs text-red-600 mt-1">${errorsData[fieldName][0]}</p>`;
+    }
+    
     fieldHtml += `</div>`;
     
     return fieldHtml;
@@ -522,6 +529,9 @@ function renderFileUploadComponent(attribute) {
     // Initialize file upload manager for this attribute
     initializeFileUploadForAttribute(attribute.attribute_id, config);
 }
+
+// Store file managers globally
+window.fileManagers = window.fileManagers || {};
 
 // Initialize file upload for specific attribute
 function initializeFileUploadForAttribute(attributeId, config) {
@@ -633,7 +643,7 @@ function initializeFileUploadForAttribute(attributeId, config) {
                     </div>
                 </div>
                 <div class="file-actions">
-                    <button type="button" onclick="removeFile(${index})" class="remove-file-btn">
+                    <button type="button" onclick="window.fileManagers[${attributeId}].removeFile(${index})" class="remove-file-btn">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                         </svg>
@@ -651,8 +661,11 @@ function initializeFileUploadForAttribute(attributeId, config) {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
     
-    // Make removeFile function globally accessible
-    window.removeFile = removeFile;
+    // Store manager in global object
+    window.fileManagers[attributeId] = {
+        removeFile: removeFile,
+        handleFiles: handleFiles
+    };
 }
 
 // Initialize attributes on page load if entity type is pre-selected

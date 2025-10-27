@@ -148,9 +148,10 @@ class EavController extends Controller
     {
         $entityData = $this->eavService->getEntityWithAttributes($id);
         
-        return Inertia::render('EAV/Show', [
+        return view('eav.show', [
             'entity' => $entityData['entity'],
-            'attributes' => $entityData['attributes']
+            'attributes' => $entityData['attributes'],
+            'title' => 'View Entity - EAV'
         ]);
     }
 
@@ -170,28 +171,30 @@ class EavController extends Controller
         ->get();
 
         // Get current attribute values
-        $attributeValues = [];
-        foreach ($attributes as $attribute) {
-            $value = $entity->getEavAttributeValue($attribute->attribute_code);
-            $attributeValues['attr_' . $attribute->attribute_id] = $value;
-        }
-
-        // Get entity types for dropdown
-        $entityTypes = EntityType::orderBy('type_name')->get();
-        
-        // Get current attribute values in the format expected by EntityForm
         $currentAttributes = [];
         foreach ($attributes as $attribute) {
             $value = $entity->getEavAttributeValue($attribute->attribute_code);
             $currentAttributes[$attribute->attribute_code] = $value;
         }
-        
-        $entity->attributes = $currentAttributes;
 
-        return Inertia::render('EntityTypes/EntityForm', [
+        // Get entity types for dropdown
+        $entityTypes = EntityType::orderBy('type_name')->get();
+        
+        // Get all available parent entities for selection
+        $allEntities = Entity::with('entityType')
+            ->where('entity_id', '!=', $entity->entity_id)
+            ->where('is_active', true)
+            ->orderBy('entity_name')
+            ->get();
+
+        return view('eav.edit', [
             'entity' => $entity,
+            'attributes' => $attributes,
             'entityTypes' => $entityTypes,
-            'entityTypeId' => $entity->entity_type_id
+            'entityTypeId' => $entity->entity_type_id,
+            'currentAttributes' => $currentAttributes,
+            'allEntities' => $allEntities,
+            'title' => 'Edit Entity - EAV'
         ]);
     }
 
