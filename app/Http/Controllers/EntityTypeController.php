@@ -7,7 +7,6 @@ use App\Models\Attribute;
 use App\Models\AttributeGroup;
 use App\Repositories\AttributeRepository;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
 use Illuminate\Support\Facades\Validator;
 
 class EntityTypeController extends Controller
@@ -40,8 +39,9 @@ class EntityTypeController extends Controller
 
         $entityTypes = $query->get();
 
-        return Inertia::render('EntityTypes/Index', [
-            'entityTypes' => $entityTypes
+        return view('entity-types.index', [
+            'entityTypes' => $entityTypes,
+            'title' => 'Entity Types - EAV'
         ]);
     }
 
@@ -50,10 +50,11 @@ class EntityTypeController extends Controller
      */
     public function create()
     {
-        $attributeGroups = AttributeGroup::orderBy('group_name')->get();
+        $attributes = Attribute::orderBy('attribute_label')->get();
         
-        return Inertia::render('EntityTypes/Create', [
-            'attributeGroups' => $attributeGroups
+        return view('entity-types.create', [
+            'attributes' => $attributes,
+            'title' => 'Create Entity Type - EAV'
         ]);
     }
 

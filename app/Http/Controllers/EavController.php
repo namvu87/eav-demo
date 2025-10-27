@@ -7,7 +7,6 @@ use App\Models\EntityType;
 use App\Models\Attribute;
 use App\Services\EavService;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
 use Illuminate\Support\Facades\Validator;
 
 class EavController extends Controller
@@ -50,14 +49,10 @@ class EavController extends Controller
         // Get entity types for filter
         $entityTypes = EntityType::orderBy('type_name')->get();
 
-        return Inertia::render('EAV/Index', [
+        return view('eav.index', [
             'entities' => $entities,
             'entityTypes' => $entityTypes,
-            'filters' => [
-                'entity_type_id' => $entityTypeId,
-                'search' => $search,
-                'parent_id' => $parentId
-            ]
+            'title' => 'EAV Entities'
         ]);
     }
 
@@ -87,10 +82,13 @@ class EavController extends Controller
             $parent = Entity::with('entityType')->find($parentId);
         }
 
-        return Inertia::render('EntityTypes/EntityForm', [
+        return view('eav.create', [
             'entityTypes' => $entityTypes,
+            'attributes' => $attributes,
+            'parent' => $parent,
             'entityTypeId' => $entityTypeId,
-            'parent' => $parent
+            'parentId' => $parentId,
+            'title' => 'Create Entity - EAV'
         ]);
     }
 

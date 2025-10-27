@@ -4,10 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Entity;
 use App\Models\EntityType;
+use App\Models\Attribute;
 use App\Services\EavService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
-use Inertia\Inertia;
 
 class HierarchyController extends Controller
 {
@@ -42,9 +42,10 @@ class HierarchyController extends Controller
         // Get entity types for filter
         $entityTypes = EntityType::orderBy('type_name')->get();
 
-        return Inertia::render('EntityTypes/Hierarchy', [
+        return view('hierarchy.index', [
             'hierarchies' => $hierarchies,
-            'entityTypes' => $entityTypes
+            'entityTypes' => $entityTypes,
+            'title' => 'Entity Hierarchy'
         ]);
     }
 
@@ -59,10 +60,24 @@ class HierarchyController extends Controller
         $entityTypes = EntityType::orderBy('type_name')->get();
         $parent = $parentId ? Entity::with('entityType')->find($parentId) : null;
 
-        return Inertia::render('EntityTypes/CreateChild', [
+        $attributes = collect();
+        if ($entityTypeId) {
+            $attributes = Attribute::where(function($query) use ($entityTypeId) {
+                $query->where('entity_type_id', $entityTypeId)
+                      ->orWhereNull('entity_type_id');
+            })
+            ->with('options')
+            ->orderBy('sort_order')
+            ->get();
+        }
+
+        return view('hierarchy.create', [
             'entityTypes' => $entityTypes,
+            'attributes' => $attributes,
             'parent' => $parent,
-            'entityTypeId' => $entityTypeId
+            'entityTypeId' => $entityTypeId,
+            'parentId' => $parentId,
+            'title' => 'Create Child Entity'
         ]);
     }
 
@@ -86,23 +101,31 @@ class HierarchyController extends Controller
 
         try {
             $entity = new Entity($request->only([
-                'entity_type_id', 'parent_id', 'entity_code', 'entity_name', 'is_active'
+                'entity_type_id', 'parent_id', 'entity_code', 'entity_name', 'description', 'is_active', 'sort_order'
             ]));
 
             $entity->is_active = $request->boolean('is_active', true);
-            $entity->sort_order = 0;
+            $entity->sort_order = $request->get('sort_order', 0);
+
+            // Prepare attribute data
+            $attributeData = [];
+            foreach ($request->all() as $key => $value) {
+                if (strpos($key, 'attr_') === 0) {
+                    $attributeData[$key] = $value;
+                }
+            }
 
             // Validate attributes
             $attributeErrors = $this->eavService->validateEntityAttributes(
                 $entity->entity_type_id, 
-                $request->get('attributes', [])
+                $attributeData
             );
 
             if (!empty($attributeErrors)) {
                 return back()->withErrors($attributeErrors)->withInput();
             }
 
-            $this->eavService->saveEntityWithAttributes($entity, $request->get('attributes', []));
+            $this->eavService->saveEntityWithAttributes($entity, $attributeData);
 
             return redirect()->route('hierarchy.index')
                 ->with('success', 'Child entity created successfully.');

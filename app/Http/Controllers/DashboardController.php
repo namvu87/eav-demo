@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\EntityType;
 use App\Models\Attribute;
 use App\Models\Entity;
-use Inertia\Inertia;
 
 class DashboardController extends Controller
 {
@@ -24,10 +23,11 @@ class DashboardController extends Controller
             ->limit(10)
             ->get();
 
-        return Inertia::render('Dashboard', [
+        return view('dashboard', [
             'entityTypes' => $entityTypes,
             'attributes' => $attributes,
-            'entities' => $entities
+            'entities' => $entities,
+            'title' => 'EAV Dashboard'
         ]);
     }
 }
