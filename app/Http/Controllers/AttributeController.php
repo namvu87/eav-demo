@@ -8,7 +8,6 @@ use App\Models\EntityType;
 use App\Models\AttributeOption;
 use App\Services\AttributeService;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
 use Illuminate\Support\Facades\Validator;
 
 class AttributeController extends Controller
@@ -48,7 +47,7 @@ class AttributeController extends Controller
         $entityTypes = EntityType::orderBy('type_name')->get();
         $attributeGroups = AttributeGroup::orderBy('group_name')->get();
 
-        return Inertia::render('Attributes/Index', [
+        return view('attributes.index', [
             'attributes' => $attributes,
             'entityTypes' => $entityTypes,
             'attributeGroups' => $attributeGroups,
@@ -56,7 +55,8 @@ class AttributeController extends Controller
                 'entity_type_id' => $entityTypeId,
                 'group_id' => $groupId,
                 'search' => $search
-            ]
+            ],
+            'title' => 'Manage Attributes'
         ]);
     }
 
@@ -70,10 +70,11 @@ class AttributeController extends Controller
         $entityTypes = EntityType::orderBy('type_name')->get();
         $attributeGroups = AttributeGroup::orderBy('group_name')->get();
 
-        return Inertia::render('Attributes/Create', [
+        return view('attributes.create', [
             'entityTypes' => $entityTypes,
             'attributeGroups' => $attributeGroups,
-            'entityTypeId' => $entityTypeId
+            'entityTypeId' => $entityTypeId,
+            'title' => 'Create Attribute'
         ]);
     }
 
@@ -146,8 +147,9 @@ class AttributeController extends Controller
     {
         $attribute = Attribute::with(['entityType', 'group', 'options'])->findOrFail($id);
 
-        return Inertia::render('Attributes/Show', [
-            'attribute' => $attribute
+        return view('attributes.show', [
+            'attribute' => $attribute,
+            'title' => 'View Attribute'
         ]);
     }
 
@@ -160,10 +162,11 @@ class AttributeController extends Controller
         $entityTypes = EntityType::orderBy('type_name')->get();
         $attributeGroups = AttributeGroup::orderBy('group_name')->get();
 
-        return Inertia::render('Attributes/Edit', [
+        return view('attributes.edit', [
             'attribute' => $attribute,
             'entityTypes' => $entityTypes,
-            'attributeGroups' => $attributeGroups
+            'attributeGroups' => $attributeGroups,
+            'title' => 'Edit Attribute'
         ]);
     }
 

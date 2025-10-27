@@ -104,8 +104,7 @@ class EavController extends Controller
             'parent_id' => 'nullable|exists:entities,entity_id',
             'description' => 'nullable|string',
             'is_active' => 'boolean',
-            'sort_order' => 'integer|min:0',
-            'attributes' => 'nullable|array'
+            'sort_order' => 'integer|min:0'
         ]);
 
         if ($validator->fails()) {
@@ -121,17 +120,22 @@ class EavController extends Controller
             $entity->is_active = $request->boolean('is_active', true);
             $entity->sort_order = $request->get('sort_order', 0);
 
+            // Extract attribute values from request (attr_* fields)
+            $attributeData = collect($request->all())
+                ->filter(fn ($value, $key) => str_starts_with($key, 'attr_'))
+                ->toArray();
+
             // Validate attributes
             $attributeErrors = $this->eavService->validateEntityAttributes(
                 $entity->entity_type_id, 
-                $request->get('attributes', [])
+                $attributeData
             );
 
             if (!empty($attributeErrors)) {
                 return back()->withErrors($attributeErrors)->withInput();
             }
 
-            $this->eavService->saveEntityWithAttributes($entity, $request->get('attributes', []));
+            $this->eavService->saveEntityWithAttributes($entity, $attributeData);
 
             return redirect()->route('eav.show', $entity->entity_id)
                 ->with('success', 'Thực thể đã được tạo thành công.');
@@ -211,8 +215,7 @@ class EavController extends Controller
             'parent_id' => 'nullable|exists:entities,entity_id',
             'description' => 'nullable|string',
             'is_active' => 'boolean',
-            'sort_order' => 'integer|min:0',
-            'attributes' => 'nullable|array'
+            'sort_order' => 'integer|min:0'
         ]);
 
         if ($validator->fails()) {
@@ -225,17 +228,22 @@ class EavController extends Controller
                 'description', 'is_active', 'sort_order'
             ]));
 
+            // Extract attribute values from request (attr_* fields)
+            $attributeData = collect($request->all())
+                ->filter(fn ($value, $key) => str_starts_with($key, 'attr_'))
+                ->toArray();
+
             // Validate attributes
             $attributeErrors = $this->eavService->validateEntityAttributes(
                 $entity->entity_type_id, 
-                $request->get('attributes', [])
+                $attributeData
             );
 
             if (!empty($attributeErrors)) {
                 return back()->withErrors($attributeErrors)->withInput();
             }
 
-            $this->eavService->saveEntityWithAttributes($entity, $request->get('attributes', []));
+            $this->eavService->saveEntityWithAttributes($entity, $attributeData);
 
             return redirect()->route('eav.show', $entity->entity_id)
                 ->with('success', 'Thực thể đã được cập nhật thành công.');
