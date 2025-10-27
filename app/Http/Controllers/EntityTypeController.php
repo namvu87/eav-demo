@@ -91,8 +91,9 @@ class EntityTypeController extends Controller
             $query->with('group')->orderBy('sort_order');
         }])->findOrFail($id);
 
-        return Inertia::render('EntityTypes/Show', [
-            'entityType' => $entityType
+        return view('entity-types.show', [
+            'entityType' => $entityType,
+            'title' => 'View Entity Type'
         ]);
     }
 
@@ -104,9 +105,10 @@ class EntityTypeController extends Controller
         $entityType = EntityType::findOrFail($id);
         $attributeGroups = AttributeGroup::orderBy('group_name')->get();
 
-        return Inertia::render('EntityTypes/Edit', [
+        return view('entity-types.edit', [
             'entityType' => $entityType,
-            'attributeGroups' => $attributeGroups
+            'attributeGroups' => $attributeGroups,
+            'title' => 'Edit Entity Type'
         ]);
     }
 
@@ -170,9 +172,10 @@ class EntityTypeController extends Controller
             ->orderBy('entity_name')
             ->paginate(20);
 
-        return Inertia::render('EntityTypes/Manage', [
+        return view('entity-types.manage', [
             'entityType' => $entityType,
-            'entities' => $entities
+            'entities' => $entities,
+            'title' => 'Manage Entity Type'
         ]);
     }
 
