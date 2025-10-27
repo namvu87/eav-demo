@@ -1,21 +1,26 @@
 import './bootstrap';
 import '../css/app.css';
 
-import React from 'react';
-import { createRoot } from 'react-dom/client';
-import { createInertiaApp } from '@inertiajs/react';
-import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
+// Simple JavaScript for Blade views
+console.log('EAV System loaded successfully');
 
-const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+// Global functions for modals and interactions
+window.toggleSidebar = function() {
+    const sidebar = document.getElementById('mobile-sidebar');
+    if (sidebar) {
+        sidebar.classList.toggle('hidden');
+    }
+};
 
-createInertiaApp({
-    title: (title) => `${title} - ${appName}`,
-    resolve: (name) => resolvePageComponent(`./Pages/${name}.jsx`, import.meta.glob('./Pages/**/*.jsx')),
-    setup({ el, App, props }) {
-        const root = createRoot(el);
-        root.render(React.createElement(App, props));
-    },
-    progress: {
-        color: '#4B5563',
-    },
+// Close mobile sidebar when clicking on links
+document.addEventListener('DOMContentLoaded', function() {
+    const mobileLinks = document.querySelectorAll('#mobile-sidebar a');
+    mobileLinks.forEach(link => {
+        link.addEventListener('click', function() {
+            const sidebar = document.getElementById('mobile-sidebar');
+            if (sidebar) {
+                sidebar.classList.add('hidden');
+            }
+        });
+    });
 });

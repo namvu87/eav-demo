@@ -161,21 +161,14 @@
             </div>
 
             <!-- Pagination -->
-            @if($entities->links)
+            @if($entities->hasPages())
                 <div class="px-4 py-3 border-t border-gray-200">
                     <div class="flex items-center justify-between">
                         <div class="text-sm text-gray-700">
-                            Showing {{ $entities->from }} to {{ $entities->to }} of {{ $entities->total }} results
+                            Showing {{ $entities->firstItem() }} to {{ $entities->lastItem() }} of {{ $entities->total() }} results
                         </div>
                         <div class="flex space-x-1">
-                            @foreach($entities->links as $link)
-                                <a
-                                    href="{{ $link->url }}"
-                                    class="px-3 py-2 text-sm font-medium rounded-md {{ $link->active ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50' }}"
-                                >
-                                    {!! $link->label !!}
-                                </a>
-                            @endforeach
+                            {{ $entities->links() }}
                         </div>
                     </div>
                 </div>

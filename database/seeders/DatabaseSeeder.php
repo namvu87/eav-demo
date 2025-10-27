@@ -21,5 +21,14 @@ class DatabaseSeeder extends Seeder
             'name' => 'Test User',
             'email' => 'test@example.com',
         ]);
+
+        // Run EAV system seeders
+        $this->call([
+            AttributeGroupSeeder::class,
+            AttributeSeeder::class,
+            EntityTypeSeeder::class,
+            EntitySeeder::class,
+            HierarchySeeder::class,
+        ]);
     }
 }

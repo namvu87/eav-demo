@@ -193,6 +193,96 @@
     </div>
 </div>
 
+<style>
+.file-upload-container {
+    @apply w-full;
+}
+
+.file-upload-area {
+    @apply border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer transition-colors duration-200 hover:border-indigo-400 hover:bg-indigo-50;
+}
+
+.file-upload-area.dragover {
+    @apply border-indigo-500 bg-indigo-100;
+}
+
+.file-upload-content {
+    @apply flex flex-col items-center space-y-4;
+}
+
+.file-upload-icon {
+    @apply h-12 w-12 text-gray-400;
+}
+
+.file-upload-text {
+    @apply space-y-2;
+}
+
+.file-upload-title {
+    @apply text-lg font-medium text-gray-900;
+}
+
+.file-upload-subtitle {
+    @apply text-sm text-gray-500;
+}
+
+.file-upload-extensions {
+    @apply text-xs text-gray-400;
+}
+
+.file-preview-list {
+    @apply mt-4 bg-white border border-gray-200 rounded-lg;
+}
+
+.file-preview-header {
+    @apply flex justify-between items-center p-4 border-b border-gray-200;
+}
+
+.file-preview-title {
+    @apply text-sm font-medium text-gray-900;
+}
+
+.clear-all-btn {
+    @apply flex items-center space-x-1 text-sm text-red-600 hover:text-red-500;
+}
+
+.file-list {
+    @apply divide-y divide-gray-200;
+}
+
+.file-item {
+    @apply flex items-center justify-between p-4 hover:bg-gray-50;
+}
+
+.file-info {
+    @apply flex items-center space-x-3;
+}
+
+.file-icon {
+    @apply h-8 w-8 text-gray-400;
+}
+
+.file-details {
+    @apply flex-1;
+}
+
+.file-name {
+    @apply text-sm font-medium text-gray-900 truncate;
+}
+
+.file-size {
+    @apply text-xs text-gray-500;
+}
+
+.file-actions {
+    @apply flex items-center space-x-2;
+}
+
+.remove-file-btn {
+    @apply text-red-600 hover:text-red-500;
+}
+</style>
+
 <script>
 const attributes = @json($attributes);
 
@@ -225,6 +315,13 @@ function updateAttributes() {
     filteredAttributes.forEach(attribute => {
         const fieldHtml = generateAttributeField(attribute);
         attributesContainer.insertAdjacentHTML('beforeend', fieldHtml);
+        
+        // Render file upload component for file attributes
+        if (attribute.frontend_input === 'file') {
+            setTimeout(() => {
+                renderFileUploadComponent(attribute);
+            }, 100);
+        }
     });
     
     attributesSection.classList.remove('hidden');
@@ -341,20 +438,10 @@ function generateAttributeField(attribute) {
             
         case 'file':
             fieldHtml += `
-                <input
-                    type="file"
-                    name="${fieldName}"
-                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 ${errorClass}"
-                    ${attribute.max_file_count > 1 ? 'multiple' : ''}
-                    ${attribute.is_required ? 'required' : ''}
-                />
+                <div id="fileUpload_${attribute.attribute_id}" class="file-upload-wrapper">
+                    <!-- File upload component will be rendered here -->
+                </div>
             `;
-            if (attribute.allowed_extensions) {
-                fieldHtml += `<p class="text-xs text-gray-500">Allowed extensions: ${attribute.allowed_extensions}</p>`;
-            }
-            if (attribute.max_file_size_kb) {
-                fieldHtml += `<p class="text-xs text-gray-500">Max file size: ${attribute.max_file_size_kb} KB</p>`;
-            }
             break;
             
         default:
@@ -377,6 +464,195 @@ function generateAttributeField(attribute) {
     fieldHtml += `</div>`;
     
     return fieldHtml;
+}
+
+// Render file upload component for file attributes
+function renderFileUploadComponent(attribute) {
+    const container = document.getElementById(`fileUpload_${attribute.attribute_id}`);
+    if (!container) return;
+    
+    const config = {
+        max_file_count: attribute.max_file_count || 3,
+        max_file_size_kb: attribute.max_file_size_kb || 1024,
+        allowed_extensions: attribute.allowed_extensions || 'jpg,png,pdf'
+    };
+    
+    // Create file upload HTML
+    const fileUploadHtml = `
+        <div class="file-upload-container">
+            <div class="file-upload-area" id="fileUploadArea_${attribute.attribute_id}">
+                <div class="file-upload-content">
+                    <svg class="file-upload-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <div class="file-upload-text">
+                        <p class="file-upload-title">Kéo thả file vào đây hoặc click để chọn</p>
+                        <p class="file-upload-subtitle">
+                            Tối đa <span id="maxFileCountDisplay_${attribute.attribute_id}">${config.max_file_count}</span> files, 
+                            kích thước <span id="maxFileSizeDisplay_${attribute.attribute_id}">${Math.round(config.max_file_size_kb / 1024 * 100) / 100} MB</span> mỗi file
+                        </p>
+                        <p class="file-upload-extensions">
+                            Loại file: <span id="allowedExtensionsDisplay_${attribute.attribute_id}">${config.allowed_extensions.split(',').map(ext => ext.trim().toUpperCase()).join(', ')}</span>
+                        </p>
+                    </div>
+                </div>
+                <input type="file" id="fileInput_${attribute.attribute_id}" multiple accept="${config.allowed_extensions.split(',').map(ext => `.${ext.trim()}`).join(',')}" style="display: none;">
+            </div>
+            
+            <!-- File Preview List -->
+            <div id="filePreviewList_${attribute.attribute_id}" class="file-preview-list hidden">
+                <div class="file-preview-header">
+                    <h4 class="file-preview-title">Files đã chọn</h4>
+                    <button type="button" id="clearAllFiles_${attribute.attribute_id}" class="clear-all-btn">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Xóa tất cả
+                    </button>
+                </div>
+                <div id="fileList_${attribute.attribute_id}" class="file-list">
+                    <!-- Files will be added here dynamically -->
+                </div>
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = fileUploadHtml;
+    
+    // Initialize file upload manager for this attribute
+    initializeFileUploadForAttribute(attribute.attribute_id, config);
+}
+
+// Initialize file upload for specific attribute
+function initializeFileUploadForAttribute(attributeId, config) {
+    const uploadArea = document.getElementById(`fileUploadArea_${attributeId}`);
+    const fileInput = document.getElementById(`fileInput_${attributeId}`);
+    const clearAllBtn = document.getElementById(`clearAllFiles_${attributeId}`);
+    
+    let files = [];
+    const maxFiles = parseInt(config.max_file_count || 3);
+    const maxSize = parseInt(config.max_file_size_kb || 1024);
+    const allowedExtensions = (config.allowed_extensions || 'jpg,png,pdf').split(',').map(ext => ext.trim().toLowerCase());
+    
+    // Click to select files
+    uploadArea.addEventListener('click', () => {
+        fileInput.click();
+    });
+    
+    // File input change
+    fileInput.addEventListener('change', (e) => {
+        handleFiles(e.target.files);
+    });
+    
+    // Drag and drop
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+    });
+    
+    uploadArea.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+    });
+    
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        handleFiles(e.dataTransfer.files);
+    });
+    
+    // Clear all files
+    clearAllBtn.addEventListener('click', () => {
+        files = [];
+        updateFileList();
+    });
+    
+    function handleFiles(fileList) {
+        const newFiles = Array.from(fileList);
+        const validFiles = [];
+        
+        newFiles.forEach(file => {
+            if (validateFile(file)) {
+                validFiles.push(file);
+            }
+        });
+        
+        // Check if adding these files would exceed max count
+        if (files.length + validFiles.length > maxFiles) {
+            alert(`Chỉ được upload tối đa ${maxFiles} files`);
+            return;
+        }
+        
+        files.push(...validFiles);
+        updateFileList();
+    }
+    
+    function validateFile(file) {
+        // Check file extension
+        const extension = file.name.split('.').pop().toLowerCase();
+        if (!allowedExtensions.includes(extension)) {
+            alert(`File ${file.name} có extension không được phép. Chỉ chấp nhận: ${allowedExtensions.join(', ')}`);
+            return false;
+        }
+        
+        // Check file size
+        const fileSizeKB = file.size / 1024;
+        if (fileSizeKB > maxSize) {
+            alert(`File ${file.name} quá lớn. Kích thước tối đa: ${maxSize} KB`);
+            return false;
+        }
+        
+        return true;
+    }
+    
+    function removeFile(index) {
+        files.splice(index, 1);
+        updateFileList();
+    }
+    
+    function updateFileList() {
+        const fileList = document.getElementById(`fileList_${attributeId}`);
+        const previewList = document.getElementById(`filePreviewList_${attributeId}`);
+        
+        if (files.length === 0) {
+            previewList.classList.add('hidden');
+            return;
+        }
+        
+        previewList.classList.remove('hidden');
+        
+        fileList.innerHTML = files.map((file, index) => `
+            <div class="file-item">
+                <div class="file-info">
+                    <svg class="file-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <div class="file-details">
+                        <div class="file-name">${file.name}</div>
+                        <div class="file-size">${formatFileSize(file.size)}</div>
+                    </div>
+                </div>
+                <div class="file-actions">
+                    <button type="button" onclick="removeFile(${index})" class="remove-file-btn">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+    
+    // Make removeFile function globally accessible
+    window.removeFile = removeFile;
 }
 
 // Initialize attributes on page load if entity type is pre-selected

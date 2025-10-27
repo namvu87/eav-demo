@@ -111,14 +111,76 @@
 </div>
 
 <script>
+// Ensure DOM is loaded before running scripts
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Hierarchy page loaded');
+    initializeMoveModal();
+});
+
+// Initialize Move Modal
+function initializeMoveModal() {
+    console.log('Initializing Move Modal');
+    
+    const modal = document.getElementById('moveModal');
+    const form = document.getElementById('moveForm');
+    
+    if (!modal || !form) {
+        console.error('Move Modal elements not found');
+        return;
+    }
+    
+    console.log('Move Modal elements found');
+}
+
 function openMoveModal(entityId) {
-    document.getElementById('moveForm').action = `/hierarchy/${entityId}/move`;
-    document.getElementById('moveModal').classList.remove('hidden');
+    console.log('Opening Move Modal for entity:', entityId);
+    
+    const modal = document.getElementById('moveModal');
+    const form = document.getElementById('moveForm');
+    
+    if (!modal || !form) {
+        console.error('Move Modal elements not found');
+        return;
+    }
+    
+    form.action = `/hierarchy/${entityId}/move`;
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden'; // Prevent background scroll
 }
 
 function closeMoveModal() {
-    document.getElementById('moveModal').classList.add('hidden');
+    console.log('Closing Move Modal');
+    
+    const modal = document.getElementById('moveModal');
+    
+    if (!modal) {
+        console.error('Modal element not found');
+        return;
+    }
+    
+    modal.classList.add('hidden');
+    document.body.style.overflow = ''; // Restore scroll
 }
+
+// Close modal when clicking outside
+document.addEventListener('click', function(e) {
+    const modal = document.getElementById('moveModal');
+    if (modal && !modal.classList.contains('hidden')) {
+        if (e.target === modal) {
+            closeMoveModal();
+        }
+    }
+});
+
+// Close modal with Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const modal = document.getElementById('moveModal');
+        if (modal && !modal.classList.contains('hidden')) {
+            closeMoveModal();
+        }
+    }
+});
 
 function toggleChildren(entityId) {
     const children = document.getElementById(`children-${entityId}`);

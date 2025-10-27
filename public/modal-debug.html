@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modal Debug Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold mb-8">Modal Debug Test</h1>
+        
+        <!-- Test Buttons -->
+        <div class="space-y-4 mb-8">
+            <button onclick="testQuickCreateModal()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                Test Quick Create Modal
+            </button>
+            <button onclick="testMoveModal()" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                Test Move Modal
+            </button>
+            <button onclick="checkElements()" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">
+                Check Elements
+            </button>
+        </div>
+        
+        <!-- Debug Info -->
+        <div id="debugInfo" class="bg-white p-4 rounded shadow">
+            <h2 class="text-xl font-semibold mb-4">Debug Information</h2>
+            <div id="debugContent" class="text-sm text-gray-600">
+                Click buttons above to test modals...
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Create Modal -->
+    <div id="quickCreateModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 hidden">
+        <div class="bg-white rounded-lg max-w-md w-full p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-medium text-gray-900">Quick Create Attribute</h3>
+                <button onclick="closeQuickCreateModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            
+            <form id="quickCreateForm">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Attribute Label *</label>
+                        <input type="text" id="quickLabel" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="e.g., Full Name" required>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Attribute Code *</label>
+                        <input type="text" id="quickCode" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="e.g., full_name" required>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Input Type *</label>
+                        <select id="quickType" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required>
+                            <option value="text">Text</option>
+                            <option value="textarea">Textarea</option>
+                            <option value="select">Select</option>
+                            <option value="number">Number</option>
+                        </select>
+                    </div>
+                    
+                    <div id="dynamicFieldsContainer"></div>
+                </div>
+                
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button type="button" onclick="closeQuickCreateModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700">
+                        Create Attribute
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Move Modal -->
+    <div id="moveModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 hidden">
+        <div class="bg-white rounded-lg max-w-md w-full p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-medium text-gray-900">Move Entity</h3>
+                <button onclick="closeMoveModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            
+            <form id="moveForm">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">New Parent</label>
+                        <select class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="">No Parent (Root)</option>
+                            <option value="1">Parent 1</option>
+                            <option value="2">Parent 2</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button type="button" onclick="closeMoveModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700">
+                        Move Entity
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Debug functions
+        function updateDebugInfo(message) {
+            const debugContent = document.getElementById('debugContent');
+            const timestamp = new Date().toLocaleTimeString();
+            debugContent.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+        }
+
+        function checkElements() {
+            updateDebugInfo('Checking modal elements...');
+            
+            const quickModal = document.getElementById('quickCreateModal');
+            const quickForm = document.getElementById('quickCreateForm');
+            const quickLabel = document.getElementById('quickLabel');
+            
+            const moveModal = document.getElementById('moveModal');
+            const moveForm = document.getElementById('moveForm');
+            
+            updateDebugInfo(`Quick Modal: ${quickModal ? 'Found' : 'Missing'}`);
+            updateDebugInfo(`Quick Form: ${quickForm ? 'Found' : 'Missing'}`);
+            updateDebugInfo(`Quick Label: ${quickLabel ? 'Found' : 'Missing'}`);
+            updateDebugInfo(`Move Modal: ${moveModal ? 'Found' : 'Missing'}`);
+            updateDebugInfo(`Move Form: ${moveForm ? 'Found' : 'Missing'}`);
+        }
+
+        function testQuickCreateModal() {
+            updateDebugInfo('Testing Quick Create Modal...');
+            openQuickCreateModal();
+        }
+
+        function testMoveModal() {
+            updateDebugInfo('Testing Move Modal...');
+            openMoveModal(1);
+        }
+
+        // Modal functions
+        function openQuickCreateModal() {
+            updateDebugInfo('Opening Quick Create Modal');
+            
+            const modal = document.getElementById('quickCreateModal');
+            const labelInput = document.getElementById('quickLabel');
+            
+            if (!modal) {
+                updateDebugInfo('ERROR: Modal element not found');
+                return;
+            }
+            
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+            
+            setTimeout(() => {
+                if (labelInput) {
+                    labelInput.focus();
+                    updateDebugInfo('Modal opened and focused');
+                }
+            }, 100);
+        }
+
+        function closeQuickCreateModal() {
+            updateDebugInfo('Closing Quick Create Modal');
+            
+            const modal = document.getElementById('quickCreateModal');
+            const form = document.getElementById('quickCreateForm');
+            
+            if (!modal) {
+                updateDebugInfo('ERROR: Modal element not found');
+                return;
+            }
+            
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+            
+            if (form) {
+                form.reset();
+            }
+            
+            updateDebugInfo('Modal closed');
+        }
+
+        function openMoveModal(entityId) {
+            updateDebugInfo(`Opening Move Modal for entity: ${entityId}`);
+            
+            const modal = document.getElementById('moveModal');
+            const form = document.getElementById('moveForm');
+            
+            if (!modal || !form) {
+                updateDebugInfo('ERROR: Move Modal elements not found');
+                return;
+            }
+            
+            form.action = `/hierarchy/${entityId}/move`;
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+            
+            updateDebugInfo('Move Modal opened');
+        }
+
+        function closeMoveModal() {
+            updateDebugInfo('Closing Move Modal');
+            
+            const modal = document.getElementById('moveModal');
+            
+            if (!modal) {
+                updateDebugInfo('ERROR: Modal element not found');
+                return;
+            }
+            
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+            
+            updateDebugInfo('Move Modal closed');
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('click', function(e) {
+            const quickModal = document.getElementById('quickCreateModal');
+            const moveModal = document.getElementById('moveModal');
+            
+            if (quickModal && !quickModal.classList.contains('hidden')) {
+                if (e.target === quickModal) {
+                    closeQuickCreateModal();
+                }
+            }
+            
+            if (moveModal && !moveModal.classList.contains('hidden')) {
+                if (e.target === moveModal) {
+                    closeMoveModal();
+                }
+            }
+        });
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const quickModal = document.getElementById('quickCreateModal');
+                const moveModal = document.getElementById('moveModal');
+                
+                if (quickModal && !quickModal.classList.contains('hidden')) {
+                    closeQuickCreateModal();
+                }
+                
+                if (moveModal && !moveModal.classList.contains('hidden')) {
+                    closeMoveModal();
+                }
+            }
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            updateDebugInfo('Page loaded successfully');
+            checkElements();
+        });
+    </script>
+</body>
+</html>

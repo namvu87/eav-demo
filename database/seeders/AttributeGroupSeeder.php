@@ -2,43 +2,71 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use App\Models\AttributeGroup;
+use App\Models\EntityType;
 
 class AttributeGroupSeeder extends Seeder
 {
     /**
-     * Run the database seeder.
+     * Run the database seeds.
      */
     public function run(): void
     {
-        $groups = [
+        // Get entity types
+        $entityTypes = EntityType::all();
+        
+        if ($entityTypes->isEmpty()) {
+            $this->command->warn('No entity types found. Please run EntityTypeSeeder first.');
+            return;
+        }
+
+        // Common attribute groups
+        $commonGroups = [
             [
-                'entity_type_id' => null,
-                'group_code' => 'basic',
-                'group_name' => 'Basic Information',
-                'sort_order' => 1,
-                'is_active' => true,
+                'group_code' => 'general',
+                'group_name' => 'General Information',
+                'sort_order' => 10,
+                'description' => 'Basic information and general details'
             ],
             [
-                'entity_type_id' => null,
+                'group_code' => 'technical',
+                'group_name' => 'Technical Details',
+                'sort_order' => 20,
+                'description' => 'Technical specifications and details'
+            ],
+            [
+                'group_code' => 'media',
+                'group_name' => 'Media & Files',
+                'sort_order' => 30,
+                'description' => 'Images, documents and media files'
+            ],
+            [
+                'group_code' => 'seo',
+                'group_name' => 'SEO Settings',
+                'sort_order' => 40,
+                'description' => 'Search engine optimization settings'
+            ],
+            [
                 'group_code' => 'advanced',
                 'group_name' => 'Advanced Settings',
-                'sort_order' => 2,
-                'is_active' => true,
-            ],
-            [
-                'entity_type_id' => null,
-                'group_code' => 'metadata',
-                'group_name' => 'Metadata',
-                'sort_order' => 3,
-                'is_active' => true,
-            ],
+                'sort_order' => 50,
+                'description' => 'Advanced configuration options'
+            ]
         ];
 
-        foreach ($groups as $group) {
-            AttributeGroup::create($group);
+        foreach ($entityTypes as $entityType) {
+            foreach ($commonGroups as $groupData) {
+                AttributeGroup::create([
+                    'entity_type_id' => $entityType->entity_type_id,
+                    'group_code' => $groupData['group_code'],
+                    'group_name' => $groupData['group_name'],
+                    'sort_order' => $groupData['sort_order'],
+                    'is_active' => true
+                ]);
+            }
         }
+
+        $this->command->info('Attribute groups created successfully!');
     }
 }

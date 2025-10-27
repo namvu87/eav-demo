@@ -23,8 +23,16 @@ class AttributeService
         DB::beginTransaction();
         
         try {
+            // Prepare attribute data
+            $attributeData = $data;
+            
+            // Handle validation rules
+            if (isset($data['validation_rules'])) {
+                $attributeData['validation_rules'] = json_encode($data['validation_rules']);
+            }
+            
             // Create the attribute
-            $attribute = Attribute::create($data);
+            $attribute = Attribute::create($attributeData);
             
             // Handle options for select/multiselect
             if (in_array($data['frontend_input'] ?? '', ['select', 'multiselect']) && isset($data['options'])) {
@@ -48,8 +56,16 @@ class AttributeService
         DB::beginTransaction();
         
         try {
+            // Prepare attribute data
+            $attributeData = $data;
+            
+            // Handle validation rules
+            if (isset($data['validation_rules'])) {
+                $attributeData['validation_rules'] = json_encode($data['validation_rules']);
+            }
+            
             // Update the attribute
-            $attribute->update($data);
+            $attribute->update($attributeData);
             
             // Handle options for select/multiselect
             if (in_array($data['frontend_input'] ?? '', ['select', 'multiselect']) && isset($data['options'])) {

@@ -3,6 +3,7 @@ $navigation = [
     ['name' => 'Dashboard', 'href' => '/', 'icon' => 'home'],
     ['name' => 'Entity Types', 'href' => '/entity-types', 'icon' => 'building-office'],
     ['name' => 'Attributes', 'href' => '/attributes', 'icon' => 'wrench-screwdriver'],
+    ['name' => 'Attribute Groups', 'href' => '/attribute-groups', 'icon' => 'folder'],
     ['name' => 'Entities', 'href' => '/eav', 'icon' => 'document-text'],
     ['name' => 'Hierarchy', 'href' => '/hierarchy', 'icon' => 'squares-2x2'],
 ];
@@ -12,6 +13,7 @@ $navigation = [
     <a
         href="{{ $item['href'] }}"
         class="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900 {{ request()->is(ltrim($item['href'], '/')) ? 'bg-gray-100 text-gray-900' : '' }}"
+        onclick="console.log('Clicked on: {{ $item['name'] }} -> {{ $item['href'] }}')"
     >
         @switch($item['icon'])
             @case('home')

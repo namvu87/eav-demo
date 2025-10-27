@@ -86,7 +86,7 @@ class AttributeController extends Controller
             'entity_type_id' => 'nullable|exists:entity_types,entity_type_id',
             'attribute_code' => 'required|string|max:255',
             'attribute_label' => 'required|string|max:255',
-            'backend_type' => 'required|in:varchar,text,int,decimal,datetime,file',
+            'backend_type' => 'required|in:varchar,text,int,decimal,datetime,file,date',
             'frontend_input' => 'required|string|max:255',
             'is_required' => 'boolean',
             'is_unique' => 'boolean',
@@ -94,6 +94,9 @@ class AttributeController extends Controller
             'is_filterable' => 'boolean',
             'default_value' => 'nullable|string',
             'validation_rules' => 'nullable|array',
+            'options' => 'nullable|array',
+            'options.*.label' => 'required_with:options|string|max:255',
+            'options.*.value' => 'required_with:options|string|max:255',
             'max_file_count' => 'nullable|integer|min:1',
             'allowed_extensions' => 'nullable|string',
             'max_file_size_kb' => 'nullable|integer|min:1',
@@ -111,11 +114,27 @@ class AttributeController extends Controller
         }
 
         try {
-            $this->attributeService->createAttribute($request->all());
+            $attribute = $this->attributeService->createAttribute($request->all());
+            
+            // Check if this is an AJAX request (Quick Create)
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Attribute created successfully',
+                    'attribute' => $attribute
+                ]);
+            }
             
             return redirect()->route('attributes.index')
                 ->with('success', 'Thuộc tính đã được tạo thành công.');
         } catch (\Exception $e) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 422);
+            }
+            
             return back()->withErrors(['error' => $e->getMessage()])->withInput();
         }
     }
@@ -159,7 +178,7 @@ class AttributeController extends Controller
             'entity_type_id' => 'nullable|exists:entity_types,entity_type_id',
             'attribute_code' => 'required|string|max:255',
             'attribute_label' => 'required|string|max:255',
-            'backend_type' => 'required|in:varchar,text,int,decimal,datetime,file',
+            'backend_type' => 'required|in:varchar,text,int,decimal,datetime,file,date',
             'frontend_input' => 'required|string|max:255',
             'is_required' => 'boolean',
             'is_unique' => 'boolean',
@@ -167,6 +186,9 @@ class AttributeController extends Controller
             'is_filterable' => 'boolean',
             'default_value' => 'nullable|string',
             'validation_rules' => 'nullable|array',
+            'options' => 'nullable|array',
+            'options.*.label' => 'required_with:options|string|max:255',
+            'options.*.value' => 'required_with:options|string|max:255',
             'max_file_count' => 'nullable|integer|min:1',
             'allowed_extensions' => 'nullable|string',
             'max_file_size_kb' => 'nullable|integer|min:1',

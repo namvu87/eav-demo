@@ -5,6 +5,11 @@ use App\Http\Controllers\EavController;
 
 Route::get('/', [App\Http\Controllers\DashboardController::class, 'index']);
 
+// Test route
+Route::get('/test', function() {
+    return view('test');
+});
+
 
 Route::middleware(['web'])->group(function () {
     // EAV Routes
@@ -45,11 +50,23 @@ Route::middleware(['web'])->group(function () {
         Route::delete('/{id}', [App\Http\Controllers\AttributeController::class, 'destroy'])->name('destroy');
     });
 
+    // Attribute Group Management Routes
+    Route::prefix('attribute-groups')->name('attribute-groups.')->group(function () {
+        Route::get('/', [App\Http\Controllers\AttributeGroupController::class, 'index'])->name('index');
+        Route::get('/create', [App\Http\Controllers\AttributeGroupController::class, 'create'])->name('create');
+        Route::post('/', [App\Http\Controllers\AttributeGroupController::class, 'store'])->name('store');
+        Route::get('/{id}', [App\Http\Controllers\AttributeGroupController::class, 'show'])->name('show');
+        Route::get('/{id}/edit', [App\Http\Controllers\AttributeGroupController::class, 'edit'])->name('edit');
+        Route::put('/{id}', [App\Http\Controllers\AttributeGroupController::class, 'update'])->name('update');
+        Route::delete('/{id}', [App\Http\Controllers\AttributeGroupController::class, 'destroy'])->name('destroy');
+    });
+
     // API routes for dynamic forms
     Route::prefix('api')->group(function () {
         Route::get('/entity-types/{id}/attributes', [App\Http\Controllers\EntityTypeController::class, 'getAttributes']);
         Route::get('/entity-types/{id}', [App\Http\Controllers\EntityTypeController::class, 'show']);
         Route::get('/entities/count', [EavController::class, 'count']);
+        Route::get('/attribute-groups', [App\Http\Controllers\AttributeGroupController::class, 'getByEntityType']);
     });
 
     // Hierarchy management routes
